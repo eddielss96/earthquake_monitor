@@ -1,42 +1,35 @@
 """
-台灣地震統計面板 Taiwan Earthquake Dashboard
-=============================================
-資料來源：USGS Earthquake Catalog (FDSNWS)
-區域：台灣 (21°N–26.5°N, 119°E–124°E)
-靈感來源：DO243A - Web app development with Streamlit (Wong, Jin Yung)
+台灣地震統計面板 — 中央氣象署 API 版
+======================================
+資料：E-A0015-001（顯著有感地震）& E-A0016-001（小區域有感地震）
+API：https://opendata.cwa.gov.tw/api/v1/rest/datastore/
 """
 
+import re
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+import requests
 
 # ── 頁面設定 ─────────────────────────────────────────────────────────────────
-st.set_page_config(
-    layout="wide",
-    page_title="台灣地震統計面板",
-    page_icon="🌏"
-)
+st.set_page_config(layout="wide", page_title="台灣地震統計面板", page_icon="🌏")
 
-# ── 地震分類設定 ──────────────────────────────────────────────────────────────
+BASE_URL = "https://opendata.cwa.gov.tw/api/v1/rest/datastore"
+DATASETS = {
+    "顯著有感地震 (E-A0015-001)": "E-A0015-001",
+    "小區域有感地震 (E-A0016-001)": "E-A0016-001",
+}
+
+# ── 芮氏規模分類 ───────────────────────────────────────────────────────────────
 def classify_mag(m):
-    """依芮氏規模分類地震（參考中央氣象署分類）"""
-    if pd.isna(m):
-        return "未知"
-    if m < 3.0:
-        return "微小地震"
-    elif m < 5.0:
-        return "輕微地震"
-    elif m < 6.0:
-        return "中等地震"
-    else:
-        return "強烈地震"
+    if pd.isna(m):  return "未知"
+    if m < 3.0:     return "微小地震"
+    elif m < 5.0:   return "輕微地震"
+    elif m < 6.0:   return "中等地震"
+    else:           return "強烈地震"
 
-# 顯示順序（由強至弱）
-CAT_ORDER = ["強烈地震", "中等地震", "輕微地震", "微小地震", "未知"]
-
-# 地圖顯示顏色
-CAT_COLOR = {
+MAG_ORDER = ["強烈地震", "中等地震", "輕微地震", "微小地震", "未知"]
+MAG_COLOR = {
     "強烈地震": "#FF2D20",
     "中等地震": "#FF9F0A",
     "輕微地震": "#34C759",
@@ -44,65 +37,116 @@ CAT_COLOR = {
     "未知":     "#8E8E93",
 }
 
-# 分類標籤（含規模說明）
-CAT_LABEL = {
-    "強烈地震": "強烈地震 (M ≥ 6)",
-    "中等地震": "中等地震 (5 ≤ M < 6)",
-    "輕微地震": "輕微地震 (3 ≤ M < 5)",
-    "微小地震": "微小地震 (M < 3)",
-    "未知":     "未知",
+# ── 震度顏色（中央氣象署 0–7級） ──────────────────────────────────────────────
+INTENSITY_ORDER = ["7級", "6強", "6弱", "5強", "5弱", "4級", "3級", "2級", "1級", "0級", "未知"]
+INTENSITY_COLOR = {
+    "7級":  "#8B0000", "6強":  "#CC0000", "6弱":  "#FF2D20",
+    "5強":  "#FF6600", "5弱":  "#FF9F0A", "4級":  "#FFD700",
+    "3級":  "#34C759", "2級":  "#0A84FF", "1級":  "#64D2FF",
+    "0級":  "#8E8E93", "未知": "#C7C7CC",
 }
 
+def intensity_int(s: str) -> int:
+    """'4級'->40, '5強'->55, '5弱'->54 （用於排序與篩選）"""
+    if not s or s == "未知" or s == "不限": return -1
+    m = re.search(r'(\d+)(強|弱)?', s)
+    if not m: return -1
+    base = int(m.group(1)) * 10
+    suffix = m.group(2)
+    if suffix == "強": return base + 5
+    if suffix == "弱": return base + 4
+    return base
 
-# ── 資料載入（帶快取） ────────────────────────────────────────────────────────
-@st.cache_data(ttl=86_400, show_spinner=False)   # 快取 24 小時
-def fetch_year(year: int, min_mag: float) -> pd.DataFrame:
-    """從 USGS FDSNWS 取得單一年份的台灣地區地震 CSV"""
-    url = (
-        "https://earthquake.usgs.gov/fdsnws/event/1/query"
-        f"?format=csv"
-        f"&starttime={year}-01-01"
-        f"&endtime={year}-12-31"
-        "&minlatitude=21&maxlatitude=26.5"
-        "&minlongitude=119&maxlongitude=124"
-        f"&minmagnitude={min_mag}"
-        "&orderby=time-asc"
-        "&limit=20000"
-    )
+
+# ── JSON 安全解析工具 ─────────────────────────────────────────────────────────
+def safe_list(val):
+    """ShakingArea 單筆時 API 回傳 dict，需轉成 list"""
+    if val is None:           return []
+    if isinstance(val, list): return val
+    return [val]
+
+def parse_records(records: list, source_label: str) -> list[dict]:
+    rows = []
+    for eq in records:
+        try:
+            info  = eq["EarthquakeInfo"]
+            epi   = info["Epicenter"]
+            mag_i = info["EarthquakeMagnitude"]
+
+            shaking = safe_list(eq.get("Intensity", {}).get("ShakingArea"))
+            max_int = shaking[0].get("AreaIntensity", "未知") if shaking else "未知"
+            county_summary = " | ".join(
+                f"{a.get('CountyName','')}{a.get('AreaIntensity','')}"
+                for a in shaking if a.get("CountyName")
+            )[:200]
+
+            rows.append({
+                "no":             str(eq.get("EarthquakeNo", "")),
+                "time":           info.get("OriginTime", ""),
+                "lat":            float(epi.get("EpicenterLatitude",  0)),
+                "lon":            float(epi.get("EpicenterLongitude", 0)),
+                "depth":          float(info.get("FocalDepth", 0)),
+                "mag":            float(mag_i.get("MagnitudeValue",  0)),
+                "location":       epi.get("Location", ""),
+                "max_intensity":  max_int,
+                "intensity_sort": intensity_int(max_int),
+                "county_summary": county_summary,
+                "report_color":   eq.get("ReportColor",    ""),
+                "report_content": eq.get("ReportContent",  ""),
+                "report_img":     eq.get("ReportImageURI", ""),
+                "web":            eq.get("Web",            ""),
+                "source":         source_label,
+            })
+        except (KeyError, ValueError, TypeError):
+            continue
+    return rows
+
+
+# ── API 抓取（快取 1 小時） ───────────────────────────────────────────────────
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_dataset(dataset_id: str, api_key: str, limit: int) -> pd.DataFrame:
+    url = f"{BASE_URL}/{dataset_id}"
     try:
-        df = pd.read_csv(url)
-        return df
-    except Exception:
+        r = requests.get(
+            url,
+            params={"Authorization": api_key, "limit": limit, "format": "JSON"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except requests.HTTPError as e:
+        st.error(f"❌ HTTP 錯誤（{dataset_id}）：{e}　請確認 API 金鑰。")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"❌ 抓取失敗（{dataset_id}）：{e}")
         return pd.DataFrame()
 
+    records = data.get("records", {}).get("Earthquake", [])
+    label   = next(k for k, v in DATASETS.items() if v == dataset_id)
+    rows    = parse_records(records, label)
+    if not rows:
+        return pd.DataFrame()
 
-@st.cache_data(ttl=86_400, show_spinner=False)
-def load_data(year_start: int, year_end: int, min_mag: float) -> pd.DataFrame:
-    """整合多年資料並進行前處理"""
+    df = pd.DataFrame(rows)
+    df["time"]         = pd.to_datetime(df["time"], errors="coerce")
+    df["year"]         = df["time"].dt.year
+    df["month"]        = df["time"].dt.to_period("M").astype(str)
+    df["mag_category"] = df["mag"].apply(classify_mag)
+    return df
+
+
+def load_all(api_key: str, chosen: list, limit: int) -> pd.DataFrame:
     frames = []
-    for yr in range(year_start, year_end + 1):
-        d = fetch_year(yr, min_mag)
+    for label in chosen:
+        with st.spinner(f"載入 {label}…"):
+            d = fetch_dataset(DATASETS[label], api_key, limit)
         if not d.empty:
             frames.append(d)
-
     if not frames:
         return pd.DataFrame()
-
     df = pd.concat(frames, ignore_index=True)
-
-    # 時間處理（轉換為台灣時區 UTC+8）
-    df["time"] = pd.to_datetime(df["time"], utc=True)
-    df["time_tw"] = df["time"].dt.tz_convert("Asia/Taipei")
-    df["year"]  = df["time_tw"].dt.year
-    df["month"] = df["time_tw"].dt.to_period("M").astype(str)
-    df["date"]  = df["time_tw"].dt.date
-
-    # 規模與分類
-    df["mag"]      = pd.to_numeric(df["mag"], errors="coerce")
-    df["depth"]    = pd.to_numeric(df["depth"], errors="coerce")
-    df["category"] = df["mag"].apply(classify_mag)
-
-    return df
+    df = df.drop_duplicates(subset=["time", "lat", "lon", "mag"])
+    return df.sort_values("time", ascending=False).reset_index(drop=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -110,71 +154,75 @@ def load_data(year_start: int, year_end: int, min_mag: float) -> pd.DataFrame:
 # ══════════════════════════════════════════════════════════════════════════════
 st.sidebar.title("🌏 台灣地震統計面板")
 
-# 年份範圍
-st.sidebar.write("### 📅 選擇年份範圍")
-all_years = list(range(2000, 2026))
-year_start, year_end = st.sidebar.select_slider(
-    "選擇年份",
-    options=all_years,
-    value=(2020, 2024),
-    key="year_range"
+# API 金鑰
+st.sidebar.write("### 🔑 API 金鑰")
+try:
+    default_key = st.secrets["CWA_API_KEY"]
+except Exception:
+    default_key = ""
+api_key = st.sidebar.text_input(
+    "中央氣象署 API 金鑰",
+    value=default_key or "CWA-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    type="password",
+    help="https://opendata.cwa.gov.tw 申請免費帳號即可取得",
 )
 
-# 最小規模（需要重新抓取資料）
-st.sidebar.write("### 📡 最小規模")
-min_mag_opts = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
-min_mag = st.sidebar.select_slider(
-    "最小芮氏規模 (M)",
-    options=min_mag_opts,
-    value=2.0,
-    key="min_mag"
-)
+# 資料來源
+st.sidebar.write("### 📡 資料來源")
+chosen_datasets = [
+    label for label in DATASETS
+    if st.sidebar.checkbox(label, value=True, key=f"src_{label}")
+]
 
-# 載入資料
-progress_placeholder = st.sidebar.empty()
-progress_placeholder.info("⏳ 載入地震資料中…")
-df_raw = load_data(year_start, year_end, min_mag)
-progress_placeholder.empty()
+# 筆數
+st.sidebar.write("### 📥 每資料集筆數上限")
+limit = st.sidebar.select_slider("筆數", [30, 100, 200, 500, 1000], value=500)
 
+# 載入按鈕
+if st.sidebar.button("🔄 載入 / 重新整理", type="primary", use_container_width=True) \
+        or "df_raw" not in st.session_state:
+    if not api_key or "XXXX" in api_key:
+        st.warning("⚠️ 請輸入有效的 CWA API 金鑰後點選「載入」。")
+        st.stop()
+    if not chosen_datasets:
+        st.warning("⚠️ 請至少勾選一個資料來源。")
+        st.stop()
+    st.session_state.df_raw = load_all(api_key, chosen_datasets, limit)
+
+df_raw = st.session_state.get("df_raw", pd.DataFrame())
 if df_raw.empty:
-    st.sidebar.error("❌ 資料載入失敗，請稍後再試。")
+    st.error("❌ 資料為空，請確認 API 金鑰與網路。")
     st.stop()
 
-# 地震分類篩選
-st.sidebar.write("### 🏷️ 地震分類篩選")
-avail_cats = [c for c in CAT_ORDER if c in df_raw["category"].unique()]
-chosen_cats = []
-for cat in avail_cats:
-    if st.sidebar.checkbox(CAT_LABEL.get(cat, cat), value=True, key=f"cb_{cat}"):
-        chosen_cats.append(cat)
+# ── 篩選條件 ──────────────────────────────────────────────────────────────────
+st.sidebar.write("### 📊 規模分類篩選")
+avail_mag = [c for c in MAG_ORDER if c in df_raw["mag_category"].unique()]
+chosen_mag = [c for c in avail_mag if st.sidebar.checkbox(c, value=True, key=f"mag_{c}")]
 
-# 深度範圍
-st.sidebar.write("### 📏 深度範圍 (km)")
-dep_max_limit = min(float(df_raw["depth"].max()), 700.0)
-d_lo, d_hi = st.sidebar.slider(
-    "深度範圍",
-    min_value=0.0,
-    max_value=dep_max_limit,
-    value=(0.0, dep_max_limit),
-    step=10.0
+st.sidebar.write("### 🌊 最低震度篩選")
+min_int_label = st.sidebar.select_slider(
+    "最大震度 ≥",
+    options=["不限", "1級", "2級", "3級", "4級", "5弱", "5強", "6弱", "6強", "7級"],
+    value="不限",
 )
+min_int_val = intensity_int(min_int_label)
 
-# 說明表格與資料來源
+st.sidebar.write("### 📏 深度範圍 (km)")
+dep_max = float(min(df_raw["depth"].max(), 700.0))
+d_lo, d_hi = st.sidebar.slider("深度", 0.0, dep_max, (0.0, dep_max), 5.0)
+
 st.sidebar.markdown("""
 ---
-### 地震分類說明
+### 規模分類說明
+| 顏色 | 分類 | 規模 |
+|:---:|------|:---:|
+| 🔴 | 強烈 | ≥ 6.0 |
+| 🟠 | 中等 | 5.0–5.9 |
+| 🟢 | 輕微 | 3.0–4.9 |
+| 🔵 | 微小 | < 3.0 |
 
-| 顏色 | 分類 | 規模 (M) |
-|:---:|------|:--------:|
-| 🔴 | 強烈地震 | ≥ 6.0 |
-| 🟠 | 中等地震 | 5.0 – 5.9 |
-| 🟢 | 輕微地震 | 3.0 – 4.9 |
-| 🔵 | 微小地震 | < 3.0 |
-
-**資料來源：**  
-[USGS Earthquake Catalog](https://earthquake.usgs.gov/fdsnws/event/1/)  
-**覆蓋區域：** 21°N–26.5°N, 119°E–124°E  
-**說明：** 資料每日自動更新快取
+**© 交通部中央氣象署**  
+[氣象資料開放平台](https://opendata.cwa.gov.tw)
 """)
 
 
@@ -182,204 +230,189 @@ st.sidebar.markdown("""
 # 套用篩選
 # ══════════════════════════════════════════════════════════════════════════════
 mask = (
-    df_raw["category"].isin(chosen_cats) &
-    df_raw["depth"].between(d_lo, d_hi)
+    df_raw["mag_category"].isin(chosen_mag) &
+    df_raw["depth"].between(d_lo, d_hi) &
+    (df_raw["intensity_sort"] >= min_int_val)
 )
-df_f = df_raw[mask].copy()
+df = df_raw[mask].copy()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 主畫面：統計指標列
+# 主畫面：指標列
 # ══════════════════════════════════════════════════════════════════════════════
 c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("📋 總地震次數",   f"{len(df_f):,}")
-c2.metric("⚡ 最大規模",     f"M {df_f['mag'].max():.1f}"  if not df_f.empty else "—")
-c3.metric("📐 平均規模",     f"M {df_f['mag'].mean():.2f}" if not df_f.empty else "—")
-c4.metric("⬇️ 平均深度",    f"{df_f['depth'].mean():.1f} km" if not df_f.empty else "—")
-c5.metric("🔴 強烈地震 (M≥6)", len(df_f[df_f["mag"] >= 6]))
+c1.metric("📋 地震筆數",        f"{len(df):,}")
+c2.metric("⚡ 最大規模",        f"M {df['mag'].max():.1f}"    if not df.empty else "—")
+c3.metric("📐 平均規模",        f"M {df['mag'].mean():.2f}"   if not df.empty else "—")
+c4.metric("⬇️ 平均深度",       f"{df['depth'].mean():.1f} km" if not df.empty else "—")
+c5.metric("🔴 強烈地震 (M≥6)",  f"{len(df[df['mag']>=6]):,}")
+
+if not df.empty:
+    t_min = df["time"].min().strftime("%Y-%m-%d")
+    t_max = df["time"].max().strftime("%Y-%m-%d")
+    st.caption(f"資料期間：{t_min} ～ {t_max}")
 
 st.markdown("---")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 主畫面：搜尋列表 ＋ 地圖（左1：右2）
+# 搜尋列表 ＋ 地圖
 # ══════════════════════════════════════════════════════════════════════════════
-col_left, col_right = st.columns([1, 2])
+col_list, col_map = st.columns([1, 2])
 
-# ── 左側：搜尋結果表格 ───────────────────────────────────────────────────────
-with col_left:
-    st.write(f"""### 🔍 搜尋結果
-共找到 **{len(df_f):,}** 筆地震（{year_start}–{year_end} 年，M ≥ {min_mag}）  
-可點選列以在地圖上標示：""")
+with col_list:
+    st.write(f"### 🔍 搜尋結果  \n共 **{len(df):,}** 筆，點選列可在地圖標示並查看報告：")
 
-    # 準備顯示用資料（按規模降序）
-    disp_df = (
-        df_f[["time_tw", "mag", "depth", "place", "category"]]
-        .copy()
-        .sort_values("mag", ascending=False)
-        .reset_index(drop=True)
-    )
-    disp_df.columns = ["時間 (台灣)", "規模 (M)", "深度 (km)", "位置", "分類"]
+    disp = df[["time", "mag", "max_intensity", "depth", "location",
+               "mag_category", "report_color"]].copy()
+    disp.columns = ["時間", "規模(M)", "最大震度", "深度(km)", "位置", "規模分類", "報告顏色"]
 
-    selection_event = st.dataframe(
-        disp_df,
-        hide_index=True,
-        use_container_width=True,
-        height=420,
-        on_select="rerun",
-        selection_mode="multi-row",
+    event = st.dataframe(
+        disp, hide_index=True, use_container_width=True,
+        height=400, on_select="rerun", selection_mode="multi-row",
     )
 
-    # 展開：已選取事件詳情
-    sel_rows = (
-        selection_event.get("selection", {}).get("rows", [])
-        if selection_event else []
-    )
-    if sel_rows:
-        with st.expander("📄 已選取地震詳情", expanded=False):
-            st.dataframe(
-                disp_df.iloc[sel_rows],
-                use_container_width=True,
-                hide_index=True
-            )
+sel_rows = event.get("selection", {}).get("rows", []) if event else []
 
-# ── 右側：地圖 ──────────────────────────────────────────────────────────────
-with col_right:
-    # 若有選取列，只顯示選取的點；否則顯示全部
-    df_sorted = df_f.sort_values("mag", ascending=False).reset_index(drop=True)
-    map_df = df_sorted.iloc[sel_rows] if sel_rows else df_f
-
-    if map_df.empty:
-        # 無資料時顯示台灣空地圖
-        map_df = pd.DataFrame({
-            "latitude": [23.5], "longitude": [121],
-            "mag": [0], "depth": [0],
-            "category": ["未知"], "place": [""], "time_tw": [""]
-        })
+with col_map:
+    map_df = df.iloc[sel_rows].copy() if sel_rows else df.copy()
+    map_df["_size"] = map_df["mag"].clip(lower=0.5)
 
     fig_map = px.scatter_mapbox(
         map_df,
-        lat="latitude",
-        lon="longitude",
-        color="category",
-        color_discrete_map=CAT_COLOR,
-        size="mag",
-        size_max=18,
-        opacity=0.8,
-        hover_name="place",
+        lat="lat", lon="lon",
+        color="mag_category",
+        color_discrete_map=MAG_COLOR,
+        size="_size", size_max=22, opacity=0.82,
+        hover_name="location",
         hover_data={
-            "mag":      ":.1f",
-            "depth":    ":.1f",
-            "time_tw":  True,
-            "category": True,
-            "latitude": False,
-            "longitude": False,
+            "mag":           ":.1f",
+            "max_intensity": True,
+            "depth":         ":.1f",
+            "time":          True,
+            "source":        True,
+            "lat":           False,
+            "lon":           False,
+            "_size":         False,
         },
         labels={
-            "mag":      "規模 (M)",
-            "depth":    "深度 (km)",
-            "time_tw":  "時間",
-            "category": "分類",
+            "mag": "規模(M)", "max_intensity": "最大震度",
+            "depth": "深度(km)", "time": "時間",
+            "source": "資料集", "mag_category": "分類",
         },
-        center={"lat": 23.5, "lon": 121},
-        zoom=6,
-        height=500,
-        category_orders={"category": CAT_ORDER},
+        center={"lat": 23.5, "lon": 121.0},
+        zoom=6, height=480,
+        category_orders={"mag_category": MAG_ORDER},
     )
     fig_map.update_layout(
         mapbox_style="carto-darkmatter",
         showlegend=True,
-        legend_title_text="地震分類",
-        legend=dict(
-            bgcolor="rgba(20,20,30,0.8)",
-            font=dict(color="white")
-        ),
-        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        legend_title_text="規模分類",
+        legend=dict(bgcolor="rgba(20,20,30,0.8)", font=dict(color="white")),
+        margin=dict(r=0, t=0, l=0, b=0),
     )
     st.plotly_chart(fig_map, use_container_width=True)
 
 
+# ── 地震詳情 ──────────────────────────────────────────────────────────────────
+if sel_rows:
+    sel_df = df.iloc[sel_rows]
+    with st.expander(f"📄 已選取 {len(sel_rows)} 筆地震詳情", expanded=True):
+        if len(sel_rows) == 1:
+            row = sel_df.iloc[0]
+            img_col, txt_col = st.columns([1, 1])
+            with img_col:
+                if row["report_img"]:
+                    st.image(row["report_img"], caption="地震報告圖",
+                             use_container_width=True)
+            with txt_col:
+                st.markdown(f"""
+**地震編號：** {row['no']}  
+**時間：** {row['time']}  
+**位置：** {row['location']}  
+**芮氏規模：** M {row['mag']:.1f}  
+**深度：** {row['depth']} km  
+**最大震度：** {row['max_intensity']}  
+**震度分布：** {row['county_summary']}  
+**報告顏色：** {row['report_color']}  
+
+📝 {row['report_content']}  
+🔗 [氣象署詳細報告]({row['web']})
+""")
+        else:
+            st.dataframe(
+                sel_df[["time", "mag", "max_intensity", "depth",
+                        "location", "county_summary", "report_color"]].rename(columns={
+                    "time": "時間", "mag": "規模(M)", "max_intensity": "最大震度",
+                    "depth": "深度(km)", "location": "位置",
+                    "county_summary": "震度分布", "report_color": "報告顏色",
+                }),
+                hide_index=True, use_container_width=True,
+            )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# 統計圖表區
+# 統計圖表
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
 st.write("### 📊 統計圖表")
 
-chart_row1_col1, chart_row1_col2 = st.columns(2)
+r1c1, r1c2 = st.columns(2)
 
-# ── 每月地震次數（堆疊長條圖） ──────────────────────────────────────────────
-with chart_row1_col1:
-    monthly = (
-        df_f.groupby(["month", "category"])
-        .size()
+with r1c1:
+    monthly = df.groupby(["month", "mag_category"]).size().reset_index(name="次數")
+    fig1 = px.bar(
+        monthly, x="month", y="次數",
+        color="mag_category", color_discrete_map=MAG_COLOR,
+        title="每月地震次數（按規模分類）",
+        labels={"month": "月份", "次數": "次數", "mag_category": "分類"},
+        category_orders={"mag_category": MAG_ORDER},
+    )
+    fig1.update_layout(xaxis_tickangle=45, legend_title_text="分類")
+    st.plotly_chart(fig1, use_container_width=True)
+
+with r1c2:
+    int_count = (
+        df.groupby("max_intensity").size()
         .reset_index(name="次數")
+        .assign(sort_key=lambda x: x["max_intensity"].map(intensity_int))
+        .sort_values("sort_key", ascending=False)
     )
-    monthly = monthly[monthly["category"].isin(avail_cats)]
-    fig_bar = px.bar(
-        monthly,
-        x="month",
-        y="次數",
-        color="category",
-        color_discrete_map=CAT_COLOR,
-        title="每月地震次數（按分類）",
-        labels={"month": "月份", "次數": "次數", "category": "分類"},
-        category_orders={"category": CAT_ORDER},
+    fig2 = px.bar(
+        int_count, x="max_intensity", y="次數",
+        color="max_intensity", color_discrete_map=INTENSITY_COLOR,
+        title="最大震度分布",
+        labels={"max_intensity": "最大震度", "次數": "次數"},
+        category_orders={"max_intensity": INTENSITY_ORDER},
     )
-    fig_bar.update_layout(xaxis_tickangle=45, legend_title_text="分類")
-    st.plotly_chart(fig_bar, use_container_width=True)
+    fig2.update_layout(showlegend=False)
+    st.plotly_chart(fig2, use_container_width=True)
 
-# ── 規模頻率分布 ────────────────────────────────────────────────────────────
-with chart_row1_col2:
-    fig_hist = px.histogram(
-        df_f, x="mag",
-        nbins=40,
-        color="category",
-        color_discrete_map=CAT_COLOR,
-        title="規模頻率分布（Magnitude-Frequency）",
-        labels={"mag": "芮氏規模 (M)", "count": "次數", "category": "分類"},
-        category_orders={"category": CAT_ORDER},
+r2c1, r2c2 = st.columns(2)
+
+with r2c1:
+    fig3 = px.histogram(
+        df, x="mag", nbins=35,
+        color="mag_category", color_discrete_map=MAG_COLOR,
+        title="規模頻率分布",
+        labels={"mag": "芮氏規模(M)", "mag_category": "分類"},
+        category_orders={"mag_category": MAG_ORDER},
     )
-    fig_hist.update_layout(barmode="stack", legend_title_text="分類")
-    fig_hist.update_xaxes(title="芮氏規模 (M)")
-    fig_hist.update_yaxes(title="次數")
-    st.plotly_chart(fig_hist, use_container_width=True)
+    fig3.update_layout(barmode="stack", legend_title_text="分類")
+    st.plotly_chart(fig3, use_container_width=True)
 
-chart_row2_col1, chart_row2_col2 = st.columns(2)
-
-# ── 年度趨勢折線圖 ──────────────────────────────────────────────────────────
-with chart_row2_col1:
-    annual = df_f.groupby("year").size().reset_index(name="次數")
-    fig_line = px.line(
-        annual,
-        x="year",
-        y="次數",
-        title="年度地震次數趨勢",
-        labels={"year": "年份", "次數": "地震次數"},
-        markers=True,
+with r2c2:
+    n = min(2000, len(df))
+    df_s = df.sample(n, random_state=42) if len(df) > n else df
+    fig4 = px.scatter(
+        df_s, x="mag", y="depth",
+        color="mag_category", color_discrete_map=MAG_COLOR,
+        opacity=0.55,
+        title="規模 vs 深度",
+        labels={"mag": "芮氏規模(M)", "depth": "深度(km)", "mag_category": "分類"},
+        category_orders={"mag_category": MAG_ORDER},
+        hover_data={"location": True, "max_intensity": True},
     )
-    fig_line.update_traces(line_color="#0A84FF", marker_color="#FF9F0A")
-    fig_line.update_xaxes(dtick=1)
-    st.plotly_chart(fig_line, use_container_width=True)
-
-# ── 規模 vs 深度散佈圖 ──────────────────────────────────────────────────────
-with chart_row2_col2:
-    # 最多 3000 點以保持效能
-    sample_n = min(3000, len(df_f))
-    df_sample = df_f.sample(sample_n, random_state=42) if len(df_f) > sample_n else df_f
-
-    fig_scat = px.scatter(
-        df_sample,
-        x="mag",
-        y="depth",
-        color="category",
-        color_discrete_map=CAT_COLOR,
-        opacity=0.5,
-        title=f"規模 vs 深度（隨機抽樣 {sample_n:,} 點）",
-        labels={"mag": "芮氏規模 (M)", "depth": "深度 (km)", "category": "分類"},
-        category_orders={"category": CAT_ORDER},
-        hover_data={"mag": True, "depth": True, "category": True},
-    )
-    # 深度軸反轉（深度越大越往下）
-    fig_scat.update_yaxes(autorange="reversed", title="深度 (km)")
-    fig_scat.update_layout(legend_title_text="分類")
-    st.plotly_chart(fig_scat, use_container_width=True)
+    fig4.update_yaxes(autorange="reversed")
+    fig4.update_layout(legend_title_text="分類")
+    st.plotly_chart(fig4, use_container_width=True)

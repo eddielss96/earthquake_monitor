@@ -10,6 +10,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import requests
+import urllib3
+
+# 氣象署憑證缺少 Subject Key Identifier，關閉 SSL 驗證警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ── 頁面設定 ─────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="台灣地震統計面板", page_icon="🌏")
@@ -111,6 +115,7 @@ def fetch_dataset(dataset_id: str, api_key: str, limit: int) -> pd.DataFrame:
             url,
             params={"Authorization": api_key, "limit": limit, "format": "JSON"},
             timeout=20,
+            verify=False,   # 氣象署憑證缺少 Subject Key Identifier
         )
         r.raise_for_status()
         data = r.json()

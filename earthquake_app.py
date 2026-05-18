@@ -163,15 +163,20 @@ with tab_cat:
     # ── 資料抓取函式 ──────────────────────────────────────────────────────────
 
     @st.cache_data(ttl=3600, show_spinner=False)
-    def fetch_cat_current(api_key: str) -> pd.DataFrame:
-        """E-A0073-001：本年度 REST API（回傳路徑兼容 cwaopendata / records 兩種）"""
-        data = api_get("E-A0073-001", api_key, {"limit": 2000})
-        if not data:
+    def fetch_cat_current() -> pd.DataFrame:
+        """E-A0073-001：本年度目錄，從 S3 下載 JSON（無需 API key，與 E-A0073-002 同機制）"""
+        url = f"{S3}/E-A0073-001.json"
+        try:
+            r = requests.get(url, timeout=30, verify=False)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            st.warning(f"⚠️ E-A0073-001 下載失敗：{e}")
             return pd.DataFrame()
-        # 支援兩種路徑
+        # 路徑：cwaopendata → Dataset → Catalog → EarthquakeInfo
         catalog = (
-            data.get("records", {}).get("Catalog")
-            or data.get("cwaopendata", {}).get("Dataset", {}).get("Catalog")
+            data.get("cwaopendata", {}).get("Dataset", {}).get("Catalog")
+            or data.get("records", {}).get("Catalog")
             or {}
         )
         eqs = safe_list(catalog.get("EarthquakeInfo", []))
@@ -179,13 +184,13 @@ with tab_cat:
         for eq in eqs:
             try:
                 rows.append({
-                    "time":  eq["OriginTime"],
-                    "lon":   float(eq["EpicenterLongitude"]),
-                    "lat":   float(eq["EpicenterLatitude"]),
-                    "depth": float(eq["FocalDepth"]),
-                    "mag":   float(str(eq["LocalMagnitude"]).strip()),
+                    "time":    eq["OriginTime"],
+                    "lon":     float(eq["EpicenterLongitude"]),
+                    "lat":     float(eq["EpicenterLatitude"]),
+                    "depth":   float(eq["FocalDepth"]),
+                    "mag":     float(str(eq["LocalMagnitude"]).strip()),
                     "quality": eq.get("Quality", ""),
-                    "source": "E-A0073-001",
+                    "source":  "E-A0073-001",
                 })
             except Exception:
                 continue
@@ -246,7 +251,7 @@ with tab_cat:
     dfs = []
 
     with st.spinner("載入本年度地震目錄（E-A0073-001）…"):
-        df_curr = fetch_cat_current(api_key)
+        df_curr = fetch_cat_current()
     if not df_curr.empty:
         dfs.append(df_curr)
         st.success(f"✅ E-A0073-001：{len(df_curr):,} 筆")
@@ -679,11 +684,19 @@ with tab_town:
     st.caption("**E-A0015-005**：最新地震各鄉鎮震度（自動更新，每 5 分鐘快取）")
 
     @st.cache_data(ttl=300, show_spinner=False)
-    def fetch_township(api_key: str):
-        return api_get("E-A0015-005", api_key)
+    def fetch_township():
+        """E-A0015-005：鄉鎮震度，從 S3 下載 JSON（無需 API key，每 5 分鐘快取）"""
+        url = f"{S3}/E-A0015-005.json"
+        try:
+            r = requests.get(url, timeout=20, verify=False)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            st.error(f"❌ E-A0015-005 下載失敗：{e}")
+            return None
 
     with st.spinner("載入鄉鎮震度資料…"):
-        raw_town = fetch_township(api_key)
+        raw_town = fetch_township()
 
     if not raw_town:
         st.error("❌ 無法取得鄉鎮震度資料。")

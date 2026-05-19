@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=yes" />
+  <title>D0243A Demos</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.5/build/style.css" />
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.5/build/stlite.js"
+    mount(
+      {
+        requirements: ["plotly", "numpy"], // 在此列出你的 Python 程式需要的套件
+        entrypoint: "app.py",
+        files: {
+          "app.py": {
+            url: "./app.py" // 你的 Streamlit 主要程式碼檔案路徑
+          },
+        },
+      },
+      document.getElementById("root")
+    )
+  </script>
+</body>
+</html>

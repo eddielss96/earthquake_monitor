@@ -13,7 +13,7 @@
     import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.5/build/stlite.js"
     mount(
       {
-        requirements: ["plotly", "numpy"], // 在此列出你的 Python 程式需要的套件
+        requirements: ["plotly", "numpy", "requests"], // 在此列出你的 Python 程式需要的套件
         entrypoint: "app.py",
         files: {
           "app.py": {

@@ -35,25 +35,28 @@ DATA_DIR = "data"   # GitHub repo 本地備援資料夾
 
 # ── 地圖設定 ──────────────────────────────────────────────────────────────────
 MAP_STYLE_OPTIONS = {
-    "🌑 深色（預設）":         "carto-darkmatter",
-    "☀️ 淺色":               "carto-positron",
-    "🗺️ OpenStreetMap":     "open-street-map",
-    "🏔️ 地形圖 (Stamen)":   "stamen-terrain",
-    "📡 臺灣電子地圖 (NLSC)": "__nlsc_emap__",
+    "🌑 深色（預設）":          "carto-darkmatter",
+    "☀️ 淺色":                "carto-positron",
+    "🗺️ OpenStreetMap":      "open-street-map",
+    "🏔️ 地形圖 (OpenTopo)":  "__open_topo__",    # OpenTopoMap（免費）
+    "🛰️ 衛星影像 (ESRI)":    "__esri_imagery__", # ESRI World Imagery（免費）
+    "📡 臺灣電子地圖 (NLSC)":  "__nlsc_emap__",
     "🛰️ 臺灣衛星影像 (NLSC)": "__nlsc_photo__",
 }
 
 MAP_CHART_CONFIG = {
     "scrollZoom": True,
-    "displayModeBar": True,
-    "modeBarButtonsToAdd": ["zoomin2d", "zoomout2d"],
+    "displayModeBar": "hover",   # 懸停才顯示，不遮擋圖例
+    "modeBarButtonsToRemove": ["select2d", "lasso2d"],
 }
 
 def apply_map_style(fig, style_key: str, center: dict, zoom: int):
     """套用地圖樣式；NLSC 用 WMTS Raster Layer"""
     nlsc = {
-        "__nlsc_emap__":  ("https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}",  "© 國土測繪中心"),
-        "__nlsc_photo__": ("https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}", "© 國土測繪中心"),
+        "__open_topo__":    ("https://tile.opentopomap.org/{z}/{x}/{y}.png", "© OpenTopoMap contributors"),
+        "__esri_imagery__": ("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", "© ESRI"),
+        "__nlsc_emap__":    ("https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}",  "© 國土測繪中心"),
+        "__nlsc_photo__":   ("https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}", "© 國土測繪中心"),
     }
     if style_key in nlsc:
         tile_url, attr = nlsc[style_key]
@@ -145,7 +148,7 @@ except Exception:
 with st.sidebar.form("api_form"):
     api_key = st.text_input(
         "API 金鑰",
-        value=_default_key or "CWA-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+        value=_default_key or "",  # 預設為空，請手動輸入
         type="password",
         help="https://opendata.cwa.gov.tw 免費申請",
     )
@@ -349,9 +352,23 @@ with tab_cat:
             legend=dict(bgcolor="rgba(20,20,30,0.7)", font=dict(color="white")),
             margin=dict(r=0,t=0,l=0,b=0),
         )
-        st.plotly_chart(fig_m, use_container_width=True, config=MAP_CHART_CONFIG)
+        cat_map_ev = st.plotly_chart(
+            fig_m, use_container_width=True, config=MAP_CHART_CONFIG,
+            on_select="rerun", selection_mode="points", key="cat_map"
+        )
         if len(df_cf) > n:
-            st.caption(f"地圖顯示抽樣 {n:,} 筆（共 {len(df_cf):,} 筆）")
+            st.caption(f"地圖顯示抽樣 {n:,} 筆（共 {len(df_cf):,} 筆）｜滾輪縮放、拖曳平移")
+        # 點選地震點 → 顯示資訊列
+        cat_pts = (cat_map_ev or {}).get("selection", {}).get("points", [])
+        if cat_pts:
+            pt  = cat_pts[0]
+            idx = pt.get("point_index", 0)
+            if idx < len(df_map):
+                r = df_map.iloc[idx]
+                st.info(
+                    f"🔍 **M{r['mag']:.1f}** ｜ {r['time'].strftime('%Y-%m-%d %H:%M')} "
+                    f"｜ 深度 {r['depth']:.0f} km ｜ 來源：{r.get('source','')}"
+                )
 
     with col_chart:
         ann = df_cf.groupby(["year","mag_cat"]).size().reset_index(name="次數")
@@ -489,7 +506,7 @@ with tab_felt:
 
         sel = event.get("selection",{}).get("rows",[]) if event else []
         with col_r:
-            map_df = df_felt.iloc[sel].copy() if sel else df_felt.copy()
+            map_df = (df_felt.iloc[sel] if sel else df_felt).reset_index(drop=True)
             map_df["_sz"] = map_df["mag"].clip(lower=0.5)
             c_felt = {"lat":23.5,"lon":121.0}
             fig_felt = px.scatter_mapbox(
@@ -509,7 +526,29 @@ with tab_felt:
                 legend=dict(bgcolor="rgba(20,20,30,0.7)", font=dict(color="white")),
                 margin=dict(r=0,t=0,l=0,b=0),
             )
-            st.plotly_chart(fig_felt, use_container_width=True, config=MAP_CHART_CONFIG)
+            felt_map_ev = st.plotly_chart(
+                fig_felt, use_container_width=True, config=MAP_CHART_CONFIG,
+                on_select="rerun", selection_mode="points", key="felt_map"
+            )
+            st.caption("點選地圖上的地震點可查看報告連結｜滾輪縮放")
+            # 點選地圖點 → 顯示詳情 + 報告連結
+            felt_pts = (felt_map_ev or {}).get("selection", {}).get("points", [])
+            if felt_pts:
+                pt  = felt_pts[0]
+                idx = pt.get("point_index", 0)
+                if idx < len(map_df):
+                    r = map_df.iloc[idx]
+                    info_col, link_col = st.columns([4, 1])
+                    with info_col:
+                        st.info(
+                            f"🔍 **{r['location']}**　M{r['mag']:.1f}　"
+                            f"最大震度 {r['max_intensity']}　"
+                            f"深度 {r['depth']:.0f} km　"
+                            f"{r['time'].strftime('%Y-%m-%d %H:%M')}"
+                        )
+                    with link_col:
+                        if r.get("web"):
+                            st.link_button("🔗 氣象署報告", r["web"], use_container_width=True)
 
         if sel:
             with st.expander(f"📄 已選取 {len(sel)} 筆詳情", expanded=True):

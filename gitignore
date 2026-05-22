@@ -1,0 +1,15 @@
+# Streamlit secrets（含 API 金鑰，絕對不要 commit）
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# 本地備援資料（體積大，建議忽略）
+# data/E-A0073-002.zip
+
+# OS
+.DS_Store
+Thumbs.db

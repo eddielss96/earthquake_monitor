@@ -138,25 +138,57 @@ def fetch_s3_or_local(s3_url: str, local_path: str, timeout=60):
 # ══════════════════════════════════════════════════════════════════════════════
 st.sidebar.title("🌏 台灣地震資料面板")
 
-# API 金鑰 + 送出按鈕（Form 避免每次輸入都觸發重跑）
+# ── API 金鑰（安全版）────────────────────────────────────────────────────────
 st.sidebar.write("### 🔑 CWA API 金鑰")
+
+_secret_key = ""
+_has_secret = False
 try:
-    _default_key = st.secrets["CWA_API_KEY"]
+    _secret_key = st.secrets["CWA_API_KEY"]
+    _has_secret = bool(_secret_key)
 except Exception:
-    _default_key = ""
+    pass
 
-with st.sidebar.form("api_form"):
-    api_key = st.text_input(
-        "API 金鑰",
-        value=_default_key or "",  # 預設為空，請手動輸入
-        type="password",
-        help="https://opendata.cwa.gov.tw 免費申請",
-    )
-    api_submitted = st.form_submit_button("✅ 套用金鑰", use_container_width=True)
+if _has_secret:
+    # Secrets 已設定 → 完全不顯示金鑰，靜默使用
+    api_key = _secret_key
+    st.sidebar.success("🔒 已從 Secrets 安全載入，金鑰不顯示於畫面")
+else:
+    # 未設定 Secrets → 顯示輸入框（本機測試用）
+    st.sidebar.warning("⚠️ 本機測試模式，正式部署請改用 Secrets")
+    with st.sidebar.form("api_form"):
+        api_key = st.text_input(
+            "API 金鑰（本機測試用）",
+            value="",
+            type="password",
+            placeholder="CWA-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+            help="正式部署請使用 Streamlit Secrets，勿將金鑰寫進程式碼",
+        )
+        api_submitted = st.form_submit_button("✅ 套用", use_container_width=True)
+        if api_submitted:
+            st.cache_data.clear()
 
-if api_submitted:
-    st.cache_data.clear()
-    st.sidebar.success("🔄 快取已清除，資料將重新載入。")
+    with st.sidebar.expander("🔐 如何安全設定 API 金鑰"):
+        st.markdown("""
+**Streamlit Community Cloud（推薦）：**
+1. 進入 App 設定 → **Secrets**
+2. 貼上：
+```toml
+CWA_API_KEY = "CWA-你的金鑰"
+```
+設定後金鑰不會出現在程式碼或畫面上。
+
+**本機開發：**
+1. 建立 `.streamlit/secrets.toml`
+2. 內容同上
+3. **務必**在 `.gitignore` 加入：
+```
+.streamlit/secrets.toml
+```
+
+> ⚠️ 切勿將金鑰寫入 `streamlit_app.py` 並 commit 到公開 repo！
+""")
+
 
 # 地圖樣式
 st.sidebar.write("### 🗺️ 地圖樣式")

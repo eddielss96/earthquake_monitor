@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>地震震波模擬</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ocean:   #071828;
+    --deep:    #0a2238;
+    --land:    #1a3a22;
+    --land2:   #224a2a;
+    --border:  #0d3321;
+    --p-wave:  #29b6f6;
+    --s-wave:  #ff7043;
+    --surf:    #ffd740;
+    --epi:     #ff1744;
+    --panel:   rgba(5,20,35,0.92);
+    --accent:  #00e5ff;
+    --text:    #cde;
+    --dim:     #567;
+    --mono:    'Share Tech Mono', monospace;
+    --sans:    'Noto Sans TC', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--ocean);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 18px;
+    background: linear-gradient(90deg, #071828 0%, #0a2238 100%);
+    border-bottom: 1px solid #1a3a5a;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  #clock {
+    font-family: var(--mono);
+    font-size: 20px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    min-width: 80px;
+    text-align: right;
+  }
+  .badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #89abc0;
+    letter-spacing: 1px;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  /* ── MAP ── */
+  #mapWrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+  #mapCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .panel {
+    width: 270px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid #1a3a5a;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 14px 12px;
+    gap: 16px;
+  }
+
+  .panel-section {
+    border-bottom: 1px solid #1a3a5a;
+    padding-bottom: 14px;
+  }
+  .section-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* Controls */
+  .ctrl-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    flex: 1;
+    padding: 7px 0;
+    border: 1px solid #1e4a6a;
+    background: #0a2238;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all .15s;
+    border-radius: 2px;
+  }
+  .btn:hover { background: #0d3a55; border-color: var(--accent); }
+  .btn.active { background: var(--accent); color: #071828; }
+  .btn-play { flex: 2; }
+
+  /* Sliders */
+  .slider-row { margin-bottom: 8px; }
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    color: var(--dim);
+    font-size: 11px;
+  }
+  .slider-label span { color: var(--text); font-family: var(--mono); }
+  input[type=range] {
+    width: 100%;
+    height: 3px;
+    appearance: none;
+    background: #1a3a5a;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* Preset buttons */
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .preset-btn {
+    padding: 5px 6px;
+    background: #0a2238;
+    border: 1px solid #1e4a6a;
+    color: #89abc0;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: left;
+    transition: all .15s;
+    border-radius: 2px;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-btn .mag { float: right; color: var(--epi); font-family: var(--mono); }
+
+  /* Legend */
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #89abc0;
+  }
+  .legend-line {
+    width: 28px;
+    height: 2px;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Station info */
+  .station-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid #122230;
+    font-size: 11px;
+  }
+  .station-name { color: #89abc0; }
+  .station-times { font-family: var(--mono); font-size: 10px; color: var(--dim); text-align: right; }
+  .station-times span { color: var(--text); }
+
+  /* ── SEISMOGRAPH STRIP ── */
+  .seismo-strip {
+    flex-shrink: 0;
+    background: #050f1a;
+    border-top: 1px solid #1a3a5a;
+    padding: 6px 8px;
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+    height: 130px;
+  }
+  .seismo-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .seismo-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .seismo-canvas {
+    flex: 1;
+    width: 100%;
+    border: 1px solid #1a3a5a;
+    border-radius: 2px;
+    background: #071828;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌏 地震震波模擬系統</h1>
+  <div class="badge" id="epicInfo">點擊地圖設定震央</div>
+  <div id="clock">T+0.0s</div>
+</header>
+
+<div class="main">
+
+  <!-- MAP -->
+  <div id="mapWrap">
+    <canvas id="mapCanvas"></canvas>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel">
+
+    <!-- Controls -->
+    <div class="panel-section">
+      <div class="section-title">▶ 控制</div>
+      <div class="ctrl-row">
+        <button class="btn btn-play" id="btnPlay" onclick="togglePlay()">▶ 播放</button>
+        <button class="btn" onclick="reset()">↺ 重設</button>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">速度倍率<span id="speedVal">×3</span></div>
+        <input type="range" id="sldSpeed" min="1" max="20" value="3" step="1"
+               oninput="simSpeed=+this.value; document.getElementById('speedVal').textContent='×'+simSpeed">
+      </div>
+    </div>
+
+    <!-- Parameters -->
+    <div class="panel-section">
+      <div class="section-title">⚙ 震源參數</div>
+      <div class="slider-row">
+        <div class="slider-label">芮氏規模<span id="magVal">M 6.5</span></div>
+        <input type="range" id="sldMag" min="4" max="9" value="6.5" step="0.1"
+               oninput="magnitude=+this.value; document.getElementById('magVal').textContent='M '+this.value; updateStationInfo()">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">震源深度<span id="depthVal">15 km</span></div>
+        <input type="range" id="sldDepth" min="5" max="200" value="15" step="5"
+               oninput="depth=+this.value; document.getElementById('depthVal').textContent=this.value+' km'; updateStationInfo()">
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="panel-section">
+      <div class="section-title">📍 歷史大地震</div>
+      <div class="preset-grid" id="presetGrid"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="panel-section">
+      <div class="section-title">█ 震波說明</div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:var(--p-wave)"></div>
+        P 波（縱波）6.0 km/s
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:var(--s-wave)"></div>
+        S 波（橫波）3.5 km/s
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:var(--surf); width:28px; border-top:2px dashed var(--surf); background:none; height:0;"></div>
+        表面波 2.5 km/s
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:var(--epi)"></div>
+        震央
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#fff; border:2px solid var(--accent)"></div>
+        測站（城市）
+      </div>
+    </div>
+
+    <!-- Station info -->
+    <div>
+      <div class="section-title">📡 各站抵達時間</div>
+      <div id="stationList"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SEISMOGRAPH STRIP -->
+<div class="seismo-strip" id="seismoStrip"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS & CONFIGURATION
+// ═══════════════════════════════════════════════════════════════
+const MAP = { lonMin:119.3, lonMax:122.8, latMin:21.4, latMax:25.7 };
+const P_SPD = 6.0, S_SPD = 3.5, SURF_SPD = 2.5;
+const SEISMO_DURATION = 120; // seconds visible in seismograph
+
+// Taiwan simplified coastline [lon, lat]
+const TAIWAN = [
+  [121.48,25.30],[121.60,25.20],[121.78,25.02],[121.90,24.85],
+  [121.95,24.60],[121.92,24.30],[121.87,24.00],[121.78,23.65],
+  [121.65,23.25],[121.45,22.90],[121.20,22.55],[121.00,22.28],
+  [120.82,22.05],[120.65,22.10],[120.48,22.35],[120.30,22.68],
+  [120.15,22.98],[120.05,23.35],[120.02,23.75],[120.05,24.10],
+  [120.15,24.42],[120.35,24.68],[120.58,24.85],[120.82,25.02],
+  [121.10,25.18],[121.30,25.27],[121.48,25.30]
+];
+
+const PENGHU = [
+  [119.58,23.78],[119.68,23.70],[119.72,23.58],
+  [119.65,23.50],[119.54,23.57],[119.52,23.68],[119.58,23.78]
+];
+
+const GREEN_I = [
+  [121.48,22.67],[121.52,22.63],[121.50,22.57],
+  [121.44,22.60],[121.45,22.67],[121.48,22.67]
+];
+
+const ORCHID_I = [
+  [121.52,22.05],[121.57,22.00],[121.55,21.93],
+  [121.48,21.95],[121.48,22.03],[121.52,22.05]
+];
+
+// Stations [name, lon, lat]
+const STATIONS = [
+  ["台北 TPE", 121.56, 25.04],
+  ["宜蘭 ILA", 121.75, 24.70],
+  ["花蓮 HLN", 121.61, 23.97],
+  ["台中 TCH", 120.67, 24.15],
+  ["台南 TNN", 120.20, 22.99],
+  ["高雄 KHH", 120.31, 22.63],
+];
+
+// Historical earthquake presets [name, lon, lat, mag, depth]
+const PRESETS = [
+  ["921 集集", 120.82, 23.85, 7.3, 8],
+  ["1999 嘉義", 120.41, 23.51, 6.4, 16],
+  ["花蓮外海", 121.69, 24.13, 6.8, 12],
+  ["2024 花蓮", 121.56, 23.82, 7.4, 15],
+  ["2006 恆春", 120.55, 21.87, 7.0, 44],
+  ["宜蘭外海", 121.90, 24.60, 6.2, 35],
+];
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let simTime   = 0;
+let simSpeed  = 3;
+let magnitude = 6.5;
+let depth     = 15;
+let playing   = false;
+let lastTs    = null;
+let epicenter = { lon: 121.56, lat: 23.82 }; // default: near Hualien
+
+// Seismograph trace buffers [time → displacement]
+let seismoBuffers = STATIONS.map(() => []);
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════════════════════════
+const mapCanvas  = document.getElementById('mapCanvas');
+const mapCtx     = mapCanvas.getContext('2d');
+const seismoCanvases = [];
+const seismoCtxs     = [];
+
+// Build seismograph strip
+const strip = document.getElementById('seismoStrip');
+STATIONS.forEach(([name], i) => {
+  const block = document.createElement('div');
+  block.className = 'seismo-block';
+  block.innerHTML = `<div class="seismo-label">${name}</div>`;
+  const cv = document.createElement('canvas');
+  cv.className = 'seismo-canvas';
+  block.appendChild(cv);
+  strip.appendChild(block);
+  seismoCanvases.push(cv);
+  seismoCtxs.push(cv.getContext('2d'));
+});
+
+// Build preset buttons
+const presetGrid = document.getElementById('presetGrid');
+PRESETS.forEach(([name, lon, lat, mag, dep]) => {
+  const btn = document.createElement('button');
+  btn.className = 'preset-btn';
+  btn.innerHTML = `${name}<span class="mag">M${mag}</span>`;
+  btn.onclick = () => {
+    epicenter = { lon, lat };
+    magnitude = mag; depth = dep;
+    document.getElementById('sldMag').value = mag;
+    document.getElementById('magVal').textContent = 'M ' + mag;
+    document.getElementById('sldDepth').value = dep;
+    document.getElementById('depthVal').textContent = dep + ' km';
+    reset();
+    document.getElementById('epicInfo').textContent =
+      `震央：${name}  M${mag}  深${dep}km`;
+    updateStationInfo();
+  };
+  presetGrid.appendChild(btn);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// COORDINATE HELPERS
+// ═══════════════════════════════════════════════════════════════
+function geoToPx(lon, lat) {
+  const W = mapCanvas.width, H = mapCanvas.height;
+  const x = (lon - MAP.lonMin) / (MAP.lonMax - MAP.lonMin) * W;
+  const y = (1 - (lat - MAP.latMin) / (MAP.latMax - MAP.latMin)) * H;
+  return [x, y];
+}
+
+function pxToGeo(px, py) {
+  const W = mapCanvas.width, H = mapCanvas.height;
+  const lon = MAP.lonMin + (px / W) * (MAP.lonMax - MAP.lonMin);
+  const lat = MAP.latMin + (1 - py / H) * (MAP.latMax - MAP.latMin);
+  return [lon, lat];
+}
+
+// Distance in km between two lon/lat points
+function geoDist(lon1, lat1, lon2, lat2) {
+  const midLat = (lat1 + lat2) * 0.5 * Math.PI / 180;
+  const dx = (lon2 - lon1) * 111 * Math.cos(midLat);
+  const dy = (lat2 - lat1) * 111;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+// km to canvas pixels (using average horizontal scale)
+function kmToPx(km) {
+  const W = mapCanvas.width;
+  const lonKm = (MAP.lonMax - MAP.lonMin) * 111 * Math.cos(23.5 * Math.PI / 180);
+  return km / lonKm * W;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PHYSICS
+// ═══════════════════════════════════════════════════════════════
+function arrivalTime(spd, dist, dep) {
+  return Math.sqrt(dist*dist + dep*dep) / spd;
+}
+
+// Deterministic "noise" for seismograph texture
+function pNoise(t, seed) {
+  return Math.sin(t*137.5 + seed*11) * 0.5
+       + Math.sin(t*359.8 + seed*7)  * 0.3
+       + Math.sin(t*811.2 + seed*3)  * 0.2;
+}
+
+function groundMotion(t, surfDist, dep, mag, seed) {
+  const hypo   = Math.sqrt(surfDist*surfDist + dep*dep);
+  const pArr   = hypo  / P_SPD;
+  const sArr   = hypo  / S_SPD;
+  const sufArr = surfDist / SURF_SPD;
+
+  // Amplitude: magnitude-based, distance-attenuated
+  const amp = Math.pow(10, 0.7 * (mag - 4.5)) / Math.max(hypo * 0.05, 1);
+
+  // Micro-noise background
+  let y = pNoise(t, seed) * 0.008 * amp;
+
+  if (t < pArr) return y;
+
+  // P-wave
+  const pDt = t - pArr;
+  const pEnv = Math.exp(-pDt * 0.4) * Math.min(1, pDt * 6);
+  y += amp * 0.35 * pEnv * Math.sin(2*Math.PI*pDt*2.2 + pNoise(pDt, seed));
+
+  if (t < sArr) return y;
+
+  // S-wave (larger)
+  const sDt = t - sArr;
+  const sEnv = Math.exp(-sDt * 0.18) * Math.min(1, sDt * 4);
+  y += amp * 1.1 * sEnv * Math.sin(2*Math.PI*sDt*0.75 + pNoise(sDt, seed+1));
+
+  if (t < sufArr || surfDist < 30) return y;
+
+  // Surface wave (slowest but longest)
+  const surDt = t - sufArr;
+  const surEnv = Math.exp(-surDt * 0.06) * Math.min(1, surDt * 2);
+  y += amp * 0.7 * surEnv * Math.sin(2*Math.PI*surDt*0.25 + pNoise(surDt, seed+2));
+
+  return y;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAWING – MAP
+// ═══════════════════════════════════════════════════════════════
+function drawPolygon(pts, fill, stroke, lw) {
+  mapCtx.beginPath();
+  pts.forEach(([lon,lat],i) => {
+    const [x,y] = geoToPx(lon,lat);
+    i===0 ? mapCtx.moveTo(x,y) : mapCtx.lineTo(x,y);
+  });
+  mapCtx.closePath();
+  if (fill)   { mapCtx.fillStyle = fill;         mapCtx.fill(); }
+  if (stroke) { mapCtx.strokeStyle = stroke; mapCtx.lineWidth = lw||1; mapCtx.stroke(); }
+}
+
+function drawGrid() {
+  mapCtx.strokeStyle = 'rgba(30,70,110,0.35)';
+  mapCtx.lineWidth = 0.5;
+  mapCtx.setLineDash([3,5]);
+  // Lon lines
+  for (let lon = 120; lon <= 122; lon++) {
+    const [x] = geoToPx(lon, MAP.latMin);
+    mapCtx.beginPath(); mapCtx.moveTo(x, 0); mapCtx.lineTo(x, mapCanvas.height); mapCtx.stroke();
+    mapCtx.fillStyle='rgba(50,100,140,0.5)'; mapCtx.font='9px '+getComputedStyle(document.body).getPropertyValue('--mono');
+    mapCtx.fillText(lon+'°E', x+3, 10);
+  }
+  // Lat lines
+  for (let lat = 22; lat <= 25; lat++) {
+    const [,y] = geoToPx(MAP.lonMin, lat);
+    mapCtx.beginPath(); mapCtx.moveTo(0,y); mapCtx.lineTo(mapCanvas.width,y); mapCtx.stroke();
+    mapCtx.fillStyle='rgba(50,100,140,0.5)';
+    mapCtx.fillText(lat+'°N', 3, y-2);
+  }
+  mapCtx.setLineDash([]);
+}
+
+function drawIntensity() {
+  // Intensity zone behind S-wave front
+  const [ex, ey] = geoToPx(epicenter.lon, epicenter.lat);
+  const sRadius = kmToPx(S_SPD * simTime);
+  if (sRadius < 2) return;
+
+  const grad = mapCtx.createRadialGradient(ex, ey, 0, ex, ey, sRadius);
+  const amp = Math.min(1, (magnitude - 4) / 3);
+  // Center: violent red, edge: fading
+  grad.addColorStop(0,    `rgba(255,17,68,${0.35*amp})`);
+  grad.addColorStop(0.15, `rgba(255,100,10,${0.25*amp})`);
+  grad.addColorStop(0.4,  `rgba(255,220,0,${0.12*amp})`);
+  grad.addColorStop(0.75, `rgba(50,180,80,${0.06*amp})`);
+  grad.addColorStop(1,    'rgba(0,0,0,0)');
+
+  mapCtx.save();
+  mapCtx.globalCompositeOperation = 'screen';
+  mapCtx.fillStyle = grad;
+  mapCtx.beginPath();
+  mapCtx.arc(ex, ey, sRadius, 0, Math.PI*2);
+  mapCtx.fill();
+  mapCtx.restore();
+}
+
+function drawWaveRing(speedKmS, color, dashed, label) {
+  const distKm = speedKmS * simTime;
+  const r = kmToPx(distKm);
+  if (r < 1) return;
+
+  const [ex, ey] = geoToPx(epicenter.lon, epicenter.lat);
+  const fade = Math.max(0, 1 - distKm / 2200); // fade over long distance
+  if (fade <= 0) return;
+
+  mapCtx.save();
+  mapCtx.strokeStyle = color;
+  mapCtx.globalAlpha = fade * 0.85;
+  mapCtx.lineWidth = 1.5;
+  if (dashed) mapCtx.setLineDash([6,4]);
+  else mapCtx.setLineDash([]);
+  mapCtx.beginPath();
+  mapCtx.arc(ex, ey, r, 0, Math.PI*2);
+  mapCtx.stroke();
+
+  // Glow effect
+  mapCtx.globalAlpha = fade * 0.25;
+  mapCtx.lineWidth = 5;
+  mapCtx.stroke();
+
+  mapCtx.setLineDash([]);
+
+  // Label at top of ring
+  if (r > 20 && r < mapCanvas.width * 0.85) {
+    mapCtx.globalAlpha = fade * 0.9;
+    mapCtx.fillStyle = color;
+    mapCtx.font = `bold 10px 'Share Tech Mono'`;
+    const lx = ex, ly = ey - r - 4;
+    if (ly > 8) mapCtx.fillText(label, lx - mapCtx.measureText(label).width/2, ly);
+  }
+  mapCtx.restore();
+}
+
+function drawEpicenter() {
+  const [ex, ey] = geoToPx(epicenter.lon, epicenter.lat);
+  const t = simTime;
+  const pulse = t < 3 ? (1 + Math.sin(t * 10) * 0.5) : 1;
+
+  // Pulsing outer ring
+  mapCtx.save();
+  mapCtx.strokeStyle = '#ff1744';
+  mapCtx.lineWidth = 1.5;
+  mapCtx.globalAlpha = 0.6 * pulse;
+  mapCtx.beginPath();
+  mapCtx.arc(ex, ey, 14 * pulse, 0, Math.PI*2);
+  mapCtx.stroke();
+
+  // Inner filled circle
+  mapCtx.globalAlpha = 1;
+  mapCtx.fillStyle = '#ff1744';
+  mapCtx.beginPath();
+  mapCtx.arc(ex, ey, 5, 0, Math.PI*2);
+  mapCtx.fill();
+
+  // Star crosshair
+  mapCtx.strokeStyle = '#ff6b6b';
+  mapCtx.lineWidth = 1;
+  mapCtx.beginPath();
+  mapCtx.moveTo(ex-10,ey); mapCtx.lineTo(ex+10,ey);
+  mapCtx.moveTo(ex,ey-10); mapCtx.lineTo(ex,ey+10);
+  mapCtx.stroke();
+  mapCtx.restore();
+}
+
+function drawStations() {
+  STATIONS.forEach(([name, lon, lat], i) => {
+    const [sx, sy] = geoToPx(lon, lat);
+    const dist = geoDist(epicenter.lon, epicenter.lat, lon, lat);
+    const hypo = Math.sqrt(dist*dist + depth*depth);
+    const pArr = hypo / P_SPD;
+    const sArr = hypo / S_SPD;
+
+    const hasP = simTime >= pArr;
+    const hasS = simTime >= sArr;
+
+    // Station dot
+    mapCtx.save();
+    mapCtx.fillStyle = hasS ? '#ff7043' : hasP ? '#29b6f6' : '#ffffff';
+    mapCtx.strokeStyle = '#00e5ff';
+    mapCtx.lineWidth = 1.5;
+    mapCtx.globalAlpha = 0.9;
+    mapCtx.beginPath();
+    mapCtx.arc(sx, sy, 5, 0, Math.PI*2);
+    mapCtx.fill();
+    mapCtx.stroke();
+
+    // Label
+    mapCtx.fillStyle = hasS ? '#ff9e80' : hasP ? '#80d8ff' : '#cde';
+    mapCtx.font = 'bold 10px ' + "'Share Tech Mono'";
+    mapCtx.fillText(name.split(' ')[0], sx+7, sy+4);
+    mapCtx.restore();
+  });
+}
+
+function drawMap() {
+  const W = mapCanvas.width, H = mapCanvas.height;
+
+  // Ocean background with gradient
+  const oceanGrad = mapCtx.createLinearGradient(0,0,0,H);
+  oceanGrad.addColorStop(0, '#071828');
+  oceanGrad.addColorStop(1, '#050f18');
+  mapCtx.fillStyle = oceanGrad;
+  mapCtx.fillRect(0,0,W,H);
+
+  // Grid
+  drawGrid();
+
+  // Intensity heatmap
+  drawIntensity();
+
+  // Land masses
+  drawPolygon(TAIWAN, '#1a3a22', '#0d4a1f', 1.5);
+  drawPolygon(PENGHU, '#1a3a22', '#0d4a1f', 1);
+  drawPolygon(GREEN_I, '#1a3a22', '#0d4a1f', 0.8);
+  drawPolygon(ORCHID_I, '#1a3a22', '#0d4a1f', 0.8);
+
+  // Wave rings (back to front)
+  drawWaveRing(SURF_SPD, '#ffd740', true,  'Surface');
+  drawWaveRing(S_SPD,    '#ff7043', false, 'S波');
+  drawWaveRing(P_SPD,    '#29b6f6', false, 'P波');
+
+  // Stations & epicenter
+  drawStations();
+  drawEpicenter();
+
+  // Corner scale bar
+  const barKm = 100;
+  const barPx = kmToPx(barKm);
+  const bx = W - barPx - 15, by = H - 18;
+  mapCtx.save();
+  mapCtx.strokeStyle='#89abc0'; mapCtx.lineWidth=1.5;
+  mapCtx.beginPath(); mapCtx.moveTo(bx,by); mapCtx.lineTo(bx+barPx,by); mapCtx.stroke();
+  mapCtx.beginPath(); mapCtx.moveTo(bx,by-4); mapCtx.lineTo(bx,by+4); mapCtx.stroke();
+  mapCtx.beginPath(); mapCtx.moveTo(bx+barPx,by-4); mapCtx.lineTo(bx+barPx,by+4); mapCtx.stroke();
+  mapCtx.fillStyle='#89abc0'; mapCtx.font='9px Share Tech Mono';
+  mapCtx.fillText('100 km', bx+barPx/2-18, by-6);
+  mapCtx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAWING – SEISMOGRAPHS
+// ═══════════════════════════════════════════════════════════════
+function drawSeismo(ctx, cv, stIdx) {
+  const W = cv.offsetWidth, H = cv.offsetHeight;
+  cv.width = W; cv.height = H;
+
+  const [, sLon, sLat] = STATIONS[stIdx];
+  const dist   = geoDist(epicenter.lon, epicenter.lat, sLon, sLat);
+  const seed   = stIdx * 7.3;
+  const maxAmp = H * 0.36;
+  const midY   = H / 2;
+  const pArr   = Math.sqrt(dist*dist + depth*depth) / P_SPD;
+  const sArr   = Math.sqrt(dist*dist + depth*depth) / S_SPD;
+  const sufArr = dist / SURF_SPD;
+
+  // Background
+  ctx.fillStyle = '#071828';
+  ctx.fillRect(0,0,W,H);
+
+  // Centre line
+  ctx.strokeStyle = 'rgba(30,70,110,0.5)';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([2,4]);
+  ctx.beginPath(); ctx.moveTo(0,midY); ctx.lineTo(W,midY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Arrival markers
+  const tStart = Math.max(0, simTime - SEISMO_DURATION);
+  function tToX(t) { return ((t - tStart) / SEISMO_DURATION) * W; }
+
+  function drawArrivalLine(arr, color, label) {
+    if (arr < tStart || arr > simTime + SEISMO_DURATION) return;
+    const x = tToX(arr);
+    if (x < 0 || x > W) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.globalAlpha=0.6; ctx.lineWidth=1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha=0.8; ctx.fillStyle=color; ctx.font='8px Share Tech Mono';
+    ctx.fillText(label, x+2, 9);
+    ctx.restore();
+  }
+  drawArrivalLine(pArr,   '#29b6f6', 'P');
+  drawArrivalLine(sArr,   '#ff7043', 'S');
+  drawArrivalLine(sufArr, '#ffd740', 'R');
+
+  // Trace
+  ctx.beginPath();
+  ctx.strokeStyle = '#39ff14';
+  ctx.lineWidth = 1;
+  const steps = W;
+  for (let px = 0; px <= steps; px++) {
+    const t = tStart + (px / steps) * SEISMO_DURATION;
+    if (t > simTime) break;
+    const disp = groundMotion(t, dist, depth, magnitude, seed);
+    const y = midY - Math.max(-maxAmp, Math.min(maxAmp, disp * maxAmp * 0.6));
+    px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+  }
+  ctx.stroke();
+
+  // Current time needle
+  ctx.save();
+  ctx.strokeStyle='rgba(0,229,255,0.7)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W,0); ctx.lineTo(W,H); ctx.stroke();
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATION INFO PANEL
+// ═══════════════════════════════════════════════════════════════
+function updateStationInfo() {
+  const list = document.getElementById('stationList');
+  list.innerHTML = STATIONS.map(([name, lon, lat]) => {
+    const dist = geoDist(epicenter.lon, epicenter.lat, lon, lat);
+    const hypo = Math.sqrt(dist*dist + depth*depth);
+    const pT = (hypo / P_SPD).toFixed(1);
+    const sT = (hypo / S_SPD).toFixed(1);
+    return `<div class="station-item">
+      <span class="station-name">${name.split(' ')[0]}</span>
+      <span class="station-times">
+        P:<span>${pT}s</span> S:<span>${sT}s</span>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════
+function resize() {
+  const wrap = document.getElementById('mapWrap');
+  mapCanvas.width  = wrap.clientWidth;
+  mapCanvas.height = wrap.clientHeight;
+}
+
+function frame(ts) {
+  if (playing) {
+    if (lastTs !== null) {
+      const dtReal = (ts - lastTs) / 1000;
+      simTime += dtReal * simSpeed;
+    }
+    lastTs = ts;
+  }
+
+  // Draw map
+  resize();
+  drawMap();
+
+  // Draw seismographs
+  seismoCanvases.forEach((cv, i) => {
+    drawSeismo(seismoCtxs[i], cv, i);
+  });
+
+  // Update HUD
+  document.getElementById('clock').textContent = 'T+' + simTime.toFixed(1) + 's';
+
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════
+function togglePlay() {
+  playing = !playing;
+  lastTs  = null;
+  const btn = document.getElementById('btnPlay');
+  btn.textContent = playing ? '⏸ 暫停' : '▶ 播放';
+  btn.classList.toggle('active', playing);
+}
+
+function reset() {
+  simTime = 0;
+  lastTs  = null;
+  playing = false;
+  document.getElementById('btnPlay').textContent = '▶ 播放';
+  document.getElementById('btnPlay').classList.remove('active');
+  seismoBuffers = STATIONS.map(() => []);
+}
+
+// Click on map to set epicenter
+mapCanvas.addEventListener('click', e => {
+  const rect = mapCanvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (mapCanvas.width  / rect.width);
+  const py = (e.clientY - rect.top)  * (mapCanvas.height / rect.height);
+  const [lon, lat] = pxToGeo(px, py);
+  if (lon >= MAP.lonMin && lon <= MAP.lonMax && lat >= MAP.latMin && lat <= MAP.latMax) {
+    epicenter = { lon, lat };
+    document.getElementById('epicInfo').textContent =
+      `震央：${lat.toFixed(2)}°N ${lon.toFixed(2)}°E`;
+    reset();
+    updateStationInfo();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('resize', resize);
+updateStationInfo();
+document.getElementById('epicInfo').textContent = '震央：23.82°N 121.56°E（花蓮）';
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

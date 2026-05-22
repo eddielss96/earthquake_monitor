@@ -215,11 +215,12 @@ st.sidebar.markdown("""
 # ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
-tab_cat, tab_felt, tab_tsu, tab_town = st.tabs([
+tab_cat, tab_felt, tab_tsu, tab_town, tab_wave = st.tabs([
     "📚 歷史地震目錄",
     "📋 有感地震報告",
     "🌊 海嘯資訊",
     "🆕 最新地震",
+    "📡 震波模擬",
 ])
 
 
@@ -852,3 +853,16 @@ with tab_town:
             st.error(f"❌ 解析資料時發生錯誤：{e}")
             with st.expander("原始資料（Debug）"):
                 st.json(raw_town)
+
+# ══════════════════════════════════════════════
+# TAB 5：震波模擬
+# ══════════════════════════════════════════════
+with tab_wave:
+    st.write("## 📡 地震震波模擬")
+    st.caption("點擊地圖設定震央 ｜ 選擇歷史地震 ｜ 調整規模深度觀察震波")
+    import streamlit.components.v1 as components
+    try:
+        with open("earthquake_wave_simulation.html", "r", encoding="utf-8") as f:
+            components.html(f.read(), height=750, scrolling=False)
+    except FileNotFoundError:
+        st.error("找不到 earthquake_wave_simulation.html，請確認檔案已放在 repo 根目錄")

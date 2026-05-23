@@ -12,20 +12,22 @@
 
   <script type="module">
     import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.80.5/build/stlite.js"
-    
+
     mount(
       {
-        // 1. 指定你的地震面板需要的第三方 Python 套件
-        // (註：urllib3, zipfile, xml 屬於 Python 內建標準庫，不需寫在這裡)
-        requirements: ["pandas", "plotly", "requests"], 
-        
-        // 2. 設定專案的啟動檔案名稱 [cite: 384]
-        entrypoint: "earthquake_app.py", 
-        
-        // 3. 對應你的 GitHub 儲存庫中的檔案路徑 [cite: 385-387]
+        // 第三方套件（xml、zipfile、json、re 是 Python 內建，不需列）
+        requirements: ["pandas", "plotly", "requests"],
+
+        // 入口點：GitHub Pages 版本（S3 資料，無需 API 金鑰）
+        entrypoint: "earthquake_app.py",
+
+        // 所有需要的檔案（從同目錄讀取）
         files: {
           "earthquake_app.py": {
             url: "./earthquake_app.py"
+          },
+          "earthquake_wave_simulation.html": {
+            url: "./earthquake_wave_simulation.html"
           }
         }
       },

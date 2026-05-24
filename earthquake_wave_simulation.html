@@ -4,240 +4,152 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>台灣有感地震震波模擬系統</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Share+Tech+Mono&family=Noto+Sans+TC:wght@300;400&display=swap" rel="stylesheet">
 <style>
-/* ─── Design Tokens ─────────────────────────────────────── */
-:root {
-  --bg:      #01080f;
-  --deep:    #020d1a;
-  --panel:   rgba(2,14,28,0.88);
-  --glass:   rgba(0,180,255,0.06);
-  --rim:     rgba(0,220,255,0.18);
-  --accent:  #00e5ff;
-  --accent2: #0080ff;
-  --p:       #29d9ff;
-  --s:       #ff4500;
-  --surf:    #ffc400;
-  --epi:     #ff1744;
-  --green:   #00ff88;
-  --text:    #6baecf;
-  --bright:  #d0ecff;
-  --dim:     #2a4a62;
-  --orb:     'Orbitron', sans-serif;
-  --mono:    'Share Tech Mono', monospace;
-  --sans:    'Noto Sans TC', sans-serif;
-  --glow-c:  0 0 8px rgba(0,229,255,.7), 0 0 24px rgba(0,229,255,.3);
-  --glow-r:  0 0 8px rgba(255,69,0,.7),  0 0 24px rgba(255,69,0,.3);
-  --glow-g:  0 0 8px rgba(0,255,136,.7), 0 0 24px rgba(0,255,136,.3);
+/* ── Design Tokens ───────────────────────────────────────── */
+:root{
+  --bg:#01080f; --panel:rgba(2,14,28,.92); --rim:rgba(0,220,255,.18);
+  --accent:#00e5ff; --p:#29d9ff; --s:#ff4500; --surf:#ffc400;
+  --epi:#ff1744; --green:#00ff88; --text:#6baecf; --bright:#d0ecff; --dim:#2a4a62;
+  --orb:'Orbitron',sans-serif; --mono:'Share Tech Mono',monospace; --sans:'Noto Sans TC',sans-serif;
+  --glow-c:0 0 8px rgba(0,229,255,.7),0 0 24px rgba(0,229,255,.3);
 }
-
-/* ─── Reset ─────────────────────────────────────────────── */
-*{box-sizing:border-box;margin:0;padding:0}
-
-/* ─── Scanline overlay ───────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0;}
 body::after{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);
 }
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:12px;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
 
-body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:var(--sans);
-  font-size:12px;
-  height:100vh;
-  overflow:hidden;
-  display:flex;
-  flex-direction:column;
-}
-
-/* ─── Header ─────────────────────────────────────────────── */
+/* ── Header ──────────────────────────────────────────────── */
 header{
-  flex-shrink:0;
-  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   padding:0 16px;height:48px;
-  background:linear-gradient(90deg,#010c18 0%,#020f20 50%,#010c18 100%);
-  border-bottom:1px solid var(--rim);
-  position:relative;
+  background:linear-gradient(90deg,#010c18,#020f20,#010c18);
+  border-bottom:1px solid var(--rim);position:relative;z-index:600;
 }
-header::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(0,229,255,.04),transparent);
-}
-.hdr-title{
-  font-family:var(--orb);font-size:13px;font-weight:600;
-  color:var(--accent);letter-spacing:3px;
-  text-shadow:var(--glow-c);
-}
+.hdr-title{font-family:var(--orb);font-size:13px;font-weight:600;color:var(--accent);letter-spacing:3px;text-shadow:var(--glow-c);}
 .hdr-right{display:flex;align-items:center;gap:20px;}
-.hdr-chip{
-  font-family:var(--mono);font-size:10px;color:var(--dim);
-  letter-spacing:1px;text-transform:uppercase;
-}
-#timerDisplay{
-  font-family:var(--orb);font-size:22px;font-weight:900;
-  color:var(--accent);letter-spacing:4px;
-  text-shadow:var(--glow-c);min-width:100px;text-align:right;
-}
+.hdr-chip{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:1px;}
+#timerDisplay{font-family:var(--orb);font-size:22px;font-weight:900;color:var(--accent);letter-spacing:4px;text-shadow:var(--glow-c);min-width:110px;text-align:right;}
 
-/* ─── Main layout ────────────────────────────────────────── */
-.main{flex:1;display:flex;overflow:hidden;gap:0;}
+/* ── Main layout ─────────────────────────────────────────── */
+.main{flex:1;display:flex;overflow:hidden;min-height:0;}
 
-/* ─── LEFT PANEL ─────────────────────────────────────────── */
-.left-panel{
-  width:260px;flex-shrink:0;
-  background:var(--panel);
-  border-right:1px solid var(--rim);
-  display:flex;flex-direction:column;
-  overflow:hidden;
-}
-.lp-section{
-  border-bottom:1px solid rgba(0,229,255,.08);
-  padding:10px 12px;
-}
-.lp-title{
-  font-family:var(--mono);font-size:9px;letter-spacing:2px;
-  color:var(--accent);text-transform:uppercase;margin-bottom:8px;
-}
-
-/* EQ List */
-.eq-list{
-  flex:1;overflow-y:auto;padding:6px 8px;
-  scrollbar-width:thin;scrollbar-color:var(--dim) transparent;
-}
-.eq-card{
-  padding:8px 10px;margin-bottom:5px;
-  border:1px solid var(--rim);border-radius:4px;
-  cursor:pointer;transition:all .2s;
-  background:var(--glass);
-  position:relative;overflow:hidden;
-}
-.eq-card::before{
-  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
-  background:transparent;transition:all .2s;
-}
+/* ── Left Panel ──────────────────────────────────────────── */
+.left-panel{width:260px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--rim);display:flex;flex-direction:column;overflow:hidden;z-index:600;}
+.lp-section{border-bottom:1px solid rgba(0,229,255,.08);padding:10px 12px;}
+.lp-title{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+.eq-list{flex:1;overflow-y:auto;padding:6px 8px;scrollbar-width:thin;scrollbar-color:var(--dim) transparent;}
+.eq-card{padding:8px 10px;margin-bottom:5px;border:1px solid var(--rim);border-radius:4px;cursor:pointer;transition:all .2s;background:rgba(0,180,255,.04);position:relative;}
+.eq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent;transition:background .2s;}
 .eq-card:hover{border-color:rgba(0,229,255,.4);background:rgba(0,229,255,.05);}
 .eq-card:hover::before{background:var(--accent);}
-.eq-card.active{
-  border-color:var(--accent);background:rgba(0,229,255,.09);
-  box-shadow:0 0 12px rgba(0,229,255,.15);
-}
+.eq-card.active{border-color:var(--accent);background:rgba(0,229,255,.09);box-shadow:0 0 12px rgba(0,229,255,.15);}
 .eq-card.active::before{background:var(--accent);box-shadow:var(--glow-c);}
 .eq-row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
-.eq-mag{
-  font-family:var(--orb);font-size:15px;font-weight:600;
-  padding:1px 6px;border-radius:2px;
-}
-.eq-mag.m7{ color:#ff1744;background:rgba(255,23,68,.15);text-shadow:var(--glow-r);}
-.eq-mag.m6{ color:#ff6d00;background:rgba(255,109,0,.12);}
-.eq-mag.m5{ color:#ffab00;background:rgba(255,171,0,.12);}
-.eq-mag.m4{ color:#76ff03;background:rgba(118,255,3,.1);}
-.eq-mag.m3{ color:var(--p);background:rgba(41,217,255,.1);}
+.eq-mag{font-family:var(--orb);font-size:15px;font-weight:600;padding:1px 6px;border-radius:2px;}
+.eq-mag.m7{color:#ff1744;background:rgba(255,23,68,.15);} .eq-mag.m6{color:#ff6d00;background:rgba(255,109,0,.12);}
+.eq-mag.m5{color:#ffab00;background:rgba(255,171,0,.12);} .eq-mag.m4{color:#76ff03;background:rgba(118,255,3,.1);}
+.eq-mag.m3{color:var(--p);background:rgba(41,217,255,.1);}
 .eq-time{font-family:var(--mono);font-size:9px;color:var(--dim);}
 .eq-loc{font-size:10px;color:var(--text);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .eq-row3{display:flex;gap:6px;}
-.eq-badge{
-  font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:2px;
-  border:1px solid var(--rim);color:var(--dim);
-}
-
-/* Controls */
+.eq-badge{font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:2px;border:1px solid var(--rim);color:var(--dim);}
 .slider-row{margin-bottom:8px;}
-.slider-lbl{
-  display:flex;justify-content:space-between;
-  font-size:10px;color:var(--dim);margin-bottom:3px;
-}
+.slider-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-bottom:3px;}
 .slider-lbl span{color:var(--bright);font-family:var(--mono);}
-input[type=range]{
-  width:100%;height:2px;appearance:none;
-  background:linear-gradient(90deg,var(--accent),var(--accent2));
-  border-radius:2px;outline:none;
-}
-input[type=range]::-webkit-slider-thumb{
-  appearance:none;width:10px;height:10px;
-  border-radius:50%;background:var(--accent);cursor:pointer;
-  box-shadow:var(--glow-c);
-}
-
-/* Buttons */
+input[type=range]{width:100%;height:2px;appearance:none;background:linear-gradient(90deg,var(--accent),#0080ff);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:var(--glow-c);}
 .btn-row{display:flex;gap:6px;margin-bottom:8px;}
-.btn{
-  flex:1;padding:6px;border:1px solid var(--rim);
-  background:transparent;color:var(--accent);
-  font-family:var(--mono);font-size:11px;letter-spacing:1px;
-  cursor:pointer;border-radius:2px;transition:all .2s;
-}
-.btn:hover{background:rgba(0,229,255,.1);border-color:var(--accent);box-shadow:var(--glow-c);}
-.btn.active{background:var(--accent);color:#010c18;box-shadow:var(--glow-c);}
+.btn{flex:1;padding:6px;border:1px solid var(--rim);background:transparent;color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:1px;cursor:pointer;border-radius:2px;transition:all .2s;}
+.btn:hover{background:rgba(0,229,255,.1);border-color:var(--accent);}
+.btn.active{background:var(--accent);color:#010c18;}
 .btn-play{flex:2;}
-
-/* Station info */
-.sta-item{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:4px 0;border-bottom:1px solid rgba(0,229,255,.05);
-}
-.sta-dot{width:7px;height:7px;border-radius:50%;margin-right:6px;flex-shrink:0;}
+.sta-item{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,229,255,.05);}
+.sta-dot{width:7px;height:7px;border-radius:50%;margin-right:6px;flex-shrink:0;transition:background .3s;}
 .sta-name{color:var(--text);font-size:10px;flex:1;}
 .sta-times{font-family:var(--mono);font-size:9px;color:var(--dim);}
 .sta-times span{color:var(--bright);}
 
-/* ─── MAP AREA ───────────────────────────────────────────── */
-#mapWrap{flex:1;position:relative;min-width:0;overflow:hidden;}
-#mapCanvas{display:block;width:100%;height:100%;}
+/* ── Tile selector ───────────────────────────────────────── */
+.tile-select{width:100%;padding:4px 6px;background:#020d1a;border:1px solid var(--rim);color:var(--text);font-family:var(--mono);font-size:10px;border-radius:2px;outline:none;cursor:pointer;}
+
+/* ── Map container ───────────────────────────────────────── */
+#mapWrap{flex:1;position:relative;min-height:0;min-width:0;}
+#map{width:100%;height:100%;}
+
+/* Leaflet overrides */
+.leaflet-container{font-family:var(--sans);}
+.leaflet-control-zoom a{background:#020d1a!important;color:var(--accent)!important;border-color:var(--rim)!important;}
+.leaflet-control-zoom a:hover{background:rgba(0,229,255,.15)!important;}
+.leaflet-control-attribution{background:rgba(2,14,28,.8)!important;color:var(--dim)!important;font-size:9px!important;}
+.leaflet-control-attribution a{color:var(--text)!important;}
+.leaflet-popup-content-wrapper{background:var(--panel);border:1px solid var(--rim);color:var(--bright);}
+.leaflet-popup-tip{background:var(--panel);}
+
+/* Epicenter marker */
+.epi-icon-outer{
+  width:28px;height:28px;border-radius:50%;
+  border:2px solid rgba(255,23,68,.6);
+  animation:ring-expand 1.5s ease-out infinite;
+}
+@keyframes ring-expand{0%{transform:scale(.5);opacity:.8}100%{transform:scale(2);opacity:0}}
+.epi-icon{
+  width:14px;height:14px;border-radius:50%;
+  background:rgba(255,23,68,.9);border:2px solid #ff6b6b;
+  box-shadow:0 0 10px #ff1744,0 0 20px rgba(255,23,68,.5);
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  animation:pulse-epi 1.2s ease-in-out infinite;
+}
+@keyframes pulse-epi{0%,100%{box-shadow:0 0 10px #ff1744,0 0 20px rgba(255,23,68,.5)}50%{box-shadow:0 0 18px #ff1744,0 0 36px rgba(255,23,68,.7)}}
+.sta-dot-marker{
+  width:10px;height:10px;border-radius:50%;
+  background:white;border:2px solid var(--accent);
+  box-shadow:0 0 6px rgba(0,229,255,.5);
+  transition:background .3s,box-shadow .3s;
+}
+.sta-dot-marker.arrived-p{background:var(--p);border-color:var(--p);box-shadow:0 0 8px rgba(41,217,255,.7);}
+.sta-dot-marker.arrived-s{background:var(--s);border-color:var(--s);box-shadow:0 0 8px rgba(255,69,0,.7);}
 
 /* Map overlay HUD */
 .map-hud{
-  position:absolute;top:10px;right:10px;
+  position:absolute;top:10px;right:10px;z-index:500;
   background:var(--panel);border:1px solid var(--rim);
-  border-radius:4px;padding:10px 14px;
-  backdrop-filter:blur(8px);min-width:160px;
+  border-radius:4px;padding:10px 14px;backdrop-filter:blur(8px);min-width:160px;
 }
-.hud-row{display:flex;justify-content:space-between;align-items:baseline;
-  margin-bottom:4px;}
+.hud-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;}
 .hud-label{font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
 .hud-val{font-family:var(--orb);font-size:14px;color:var(--accent);}
-.hud-val.red{color:var(--s);}
-.hud-val.amber{color:var(--surf);}
 
-/* Legend */
-.map-legend{
-  position:absolute;bottom:10px;right:10px;
+/* Wave legend */
+.wave-legend{
+  position:absolute;bottom:24px;right:10px;z-index:500;
   background:var(--panel);border:1px solid var(--rim);
   border-radius:4px;padding:8px 12px;backdrop-filter:blur(8px);
 }
-.leg-item{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:10px;}
-.leg-line{width:22px;height:1.5px;border-radius:1px;}
-.leg-dash{width:22px;height:0;border-top:2px dashed;}
+.leg-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:10px;color:var(--text);}
+.leg-line{width:24px;height:2px;border-radius:1px;flex-shrink:0;}
 
-/* ─── SEISMOGRAPH STRIP ──────────────────────────────────── */
+/* ── Seismograph strip ───────────────────────────────────── */
 .seismo-strip{
-  flex-shrink:0;height:128px;
-  background:#020a14;
-  border-top:1px solid var(--rim);
-  display:flex;gap:0;
+  flex-shrink:0;height:130px;background:#020a14;
+  border-top:1px solid var(--rim);display:flex;z-index:600;
 }
-.seismo-block{
-  flex:1;min-width:0;
-  display:flex;flex-direction:column;
-  border-right:1px solid rgba(0,229,255,.06);
-  padding:4px 6px;
-}
+.seismo-block{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid rgba(0,229,255,.06);padding:4px 6px;}
 .seismo-block:last-child{border-right:none;}
-.seismo-label{
-  font-family:var(--mono);font-size:8px;color:var(--accent);
-  letter-spacing:1px;margin-bottom:2px;display:flex;justify-content:space-between;
-}
-.seismo-status{font-size:8px;font-family:var(--mono);}
+.seismo-label{font-family:var(--mono);font-size:8px;color:var(--accent);letter-spacing:1px;margin-bottom:2px;display:flex;justify-content:space-between;}
+.seismo-status{font-size:8px;font-family:var(--mono);color:var(--dim);}
 .seismo-cv{flex:1;width:100%;border:1px solid rgba(0,229,255,.08);border-radius:2px;background:#010810;}
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
 <header>
   <div class="hdr-title">▌ 台灣有感地震震波模擬系統</div>
   <div class="hdr-right">
-    <span class="hdr-chip" id="eqInfo">未選擇地震</span>
+    <span class="hdr-chip" id="eqInfo">點選左側地震開始模擬</span>
     <div id="timerDisplay">T+000s</div>
   </div>
 </header>
@@ -246,16 +158,11 @@ input[type=range]::-webkit-slider-thumb{
 
   <!-- LEFT PANEL -->
   <div class="left-panel">
-
-    <!-- EQ list -->
     <div class="lp-section" style="padding-bottom:0;">
       <div class="lp-title">▶ 有感地震報告 — 點選模擬</div>
     </div>
-    <div class="eq-list" id="eqList">
-      <div style="color:var(--dim);font-size:11px;padding:10px;">載入地震資料中…</div>
-    </div>
+    <div class="eq-list" id="eqList"><div style="color:var(--dim);padding:10px;font-size:11px;">載入中…</div></div>
 
-    <!-- Controls -->
     <div class="lp-section">
       <div class="lp-title">⚙ 控制</div>
       <div class="btn-row">
@@ -265,477 +172,364 @@ input[type=range]::-webkit-slider-thumb{
       <div class="slider-row">
         <div class="slider-lbl">模擬速度<span id="spdVal">×5</span></div>
         <input type="range" id="sldSpd" min="1" max="30" value="5" step="1"
-               oninput="simSpeed=+this.value; document.getElementById('spdVal').textContent='×'+simSpeed">
+               oninput="simSpeed=+this.value;document.getElementById('spdVal').textContent='×'+simSpeed">
+      </div>
+      <div class="slider-row">
+        <div class="slider-lbl">地圖樣式</div>
+        <select class="tile-select" id="tileSelect" onchange="switchTile(this.value)">
+          <option value="dark">🌑 深色（預設）</option>
+          <option value="light">☀️ 淺色</option>
+          <option value="osm">🗺️ OpenStreetMap</option>
+          <option value="topo">🏔️ 地形圖</option>
+          <option value="satellite">🛰️ 衛星影像</option>
+          <option value="nlsc">📡 臺灣電子地圖</option>
+        </select>
       </div>
     </div>
 
-    <!-- Station arrival times -->
-    <div class="lp-section" style="flex:0;padding-bottom:8px;">
+    <div class="lp-section" style="overflow-y:auto;flex-shrink:0;">
       <div class="lp-title">📡 各站抵達時間</div>
       <div id="stationList"></div>
     </div>
-
-  </div><!-- /left-panel -->
+  </div>
 
   <!-- MAP -->
   <div id="mapWrap">
-    <canvas id="mapCanvas"></canvas>
-
-    <!-- HUD overlay -->
+    <div id="map"></div>
     <div class="map-hud">
-      <div class="hud-row">
-        <span class="hud-label">規模</span>
-        <span class="hud-val" id="hudMag">—</span>
-      </div>
-      <div class="hud-row">
-        <span class="hud-label">深度</span>
-        <span class="hud-val" id="hudDepth">—</span>
-      </div>
-      <div class="hud-row">
-        <span class="hud-label">最大震度</span>
-        <span class="hud-val amber" id="hudInt">—</span>
-      </div>
-      <div class="hud-row" style="margin-bottom:0;">
-        <span class="hud-label">震央</span>
-        <span class="hud-val" style="font-size:9px;" id="hudLoc">—</span>
-      </div>
+      <div class="hud-row"><span class="hud-label">規模</span><span class="hud-val" id="hudMag">—</span></div>
+      <div class="hud-row"><span class="hud-label">深度</span><span class="hud-val" id="hudDepth">—</span></div>
+      <div class="hud-row"><span class="hud-label">最大震度</span><span class="hud-val" style="color:var(--surf)" id="hudInt">—</span></div>
+      <div class="hud-row" style="margin-bottom:0"><span class="hud-label">震央</span><span class="hud-val" style="font-size:9px" id="hudLoc">—</span></div>
     </div>
-
-    <!-- Legend -->
-    <div class="map-legend">
-      <div class="leg-item"><div class="leg-line" style="background:var(--p)"></div><span>P 波 6.0 km/s</span></div>
-      <div class="leg-item"><div class="leg-line" style="background:var(--s)"></div><span>S 波 3.5 km/s</span></div>
-      <div class="leg-item"><div class="leg-dash" style="border-color:var(--surf)"></div><span>表面波 2.5 km/s</span></div>
+    <div class="wave-legend">
+      <div class="leg-row"><div class="leg-line" style="background:var(--p)"></div>P 波 6.0 km/s</div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--s)"></div>S 波 3.5 km/s</div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--surf);height:0;border-top:2px dashed var(--surf);width:24px"></div>表面波 2.5 km/s</div>
     </div>
   </div>
 
-</div><!-- /main -->
+</div>
 
-<!-- SEISMOGRAPH STRIP -->
 <div class="seismo-strip" id="seismoStrip"></div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ═══════════════════════════════════════════════════════════
-// EARTHQUAKE DATABASE (injected by Python or fallback)
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// EARTHQUAKE DATABASE
+// ══════════════════════════════════════════════
 /* __EQ_DB_PLACEHOLDER__ */
-
-// Historical preset fallback
 const PRESET_EQ = [
-  {no:"24037",time:"2024-04-03 07:58:11",location:"花蓮縣近海",lat:23.82,lon:121.56,depth:15,mag:7.4,max_int:"6強",web:""},
-  {no:"24018",time:"2024-04-03 10:26:00",location:"花蓮縣近海",lat:23.76,lon:121.66,depth:15,mag:6.5,max_int:"5強",web:""},
-  {no:"99921",time:"1999-09-21 01:47:16",location:"南投縣集集鎮",lat:23.85,lon:120.82,depth:8,mag:7.3,max_int:"7級",web:""},
-  {no:"13001",time:"2013-03-27 10:03:00",location:"南投縣仁愛鄉",lat:24.07,lon:121.07,depth:15,mag:6.1,max_int:"5弱",web:""},
-  {no:"06001",time:"2006-12-26 12:26:21",location:"屏東縣恆春鎮近海",lat:21.87,lon:120.55,depth:44,mag:7.0,max_int:"5強",web:""},
-  {no:"18001",time:"2018-02-06 23:50:42",location:"花蓮縣近海",lat:24.14,lon:121.62,depth:11,mag:6.2,max_int:"6弱",web:""},
+  {no:"24001",time:"2024-04-03 07:58:11",location:"花蓮縣近海",lat:23.82,lon:121.56,depth:15,mag:7.4,max_int:"6強",web:"https://scweb.cwa.gov.tw/zh-tw/earthquake/details/2024090"},
   {no:"22001",time:"2022-09-18 14:44:16",location:"台東縣池上鄉",lat:23.15,lon:121.20,depth:7,mag:6.8,max_int:"6強",web:""},
+  {no:"18001",time:"2018-02-06 23:50:42",location:"花蓮縣近海",lat:24.14,lon:121.62,depth:11,mag:6.2,max_int:"6弱",web:""},
+  {no:"06001",time:"2006-12-26 12:26:21",location:"屏東縣恆春鎮近海",lat:21.87,lon:120.55,depth:44,mag:7.0,max_int:"5強",web:""},
+  {no:"99921",time:"1999-09-21 01:47:16",location:"南投縣集集鎮",lat:23.85,lon:120.82,depth:8,mag:7.3,max_int:"7級",web:""},
 ];
+const EQ_DB = (typeof INJECTED_DB!=='undefined'&&INJECTED_DB&&INJECTED_DB.length>0)?INJECTED_DB:PRESET_EQ;
 
-const EQ_DB = (typeof INJECTED_DB !== 'undefined' && INJECTED_DB && INJECTED_DB.length > 0)
-  ? INJECTED_DB : PRESET_EQ;
-
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════
 // CONSTANTS
-// ═══════════════════════════════════════════════════════════
-const MAP     = {lonMin:119.3,lonMax:122.8,latMin:21.3,latMax:25.8};
-const P_SPD   = 6.0, S_SPD = 3.5, SURF_SPD = 2.5;
-const SEISMO_WIN = 120; // seconds
-
-const TAIWAN = [
-  [121.48,25.30],[121.60,25.20],[121.78,25.02],[121.90,24.85],
-  [121.95,24.60],[121.92,24.30],[121.87,24.00],[121.78,23.65],
-  [121.65,23.25],[121.45,22.90],[121.20,22.55],[121.00,22.28],
-  [120.82,22.05],[120.65,22.10],[120.48,22.35],[120.30,22.68],
-  [120.15,22.98],[120.05,23.35],[120.02,23.75],[120.05,24.10],
-  [120.15,24.42],[120.35,24.68],[120.58,24.85],[120.82,25.02],
-  [121.10,25.18],[121.30,25.27],[121.48,25.30]
-];
-const PENGHU  = [[119.58,23.78],[119.68,23.70],[119.72,23.58],[119.65,23.50],[119.54,23.57],[119.52,23.68],[119.58,23.78]];
-const GREEN_I = [[121.48,22.67],[121.52,22.63],[121.50,22.57],[121.44,22.60],[121.45,22.67],[121.48,22.67]];
-const ORCHID  = [[121.52,22.05],[121.57,22.00],[121.55,21.93],[121.48,21.95],[121.48,22.03],[121.52,22.05]];
-
-const STATIONS = [
-  ["台北","TPE",121.56,25.04],
-  ["宜蘭","ILA",121.75,24.70],
-  ["花蓮","HLN",121.61,23.97],
-  ["台中","TCH",120.67,24.15],
-  ["台南","TNN",120.20,22.99],
-  ["高雄","KHH",120.31,22.63],
+// ══════════════════════════════════════════════
+const P_SPD=6.0, S_SPD=3.5, SURF_SPD=2.5, SEISMO_WIN=120;
+const STATIONS=[
+  ["台北","TPE",121.56,25.04],["宜蘭","ILA",121.75,24.70],
+  ["花蓮","HLN",121.61,23.97],["台中","TCH",120.67,24.15],
+  ["台南","TNN",120.20,22.99],["高雄","KHH",120.31,22.63],
 ];
 
-// ═══════════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════════
-let simTime   = 0, simSpeed = 5, playing = false, lastTs = null;
-let epicenter = {lon:121.56,lat:23.82,depth:15,mag:7.4,location:"",max_int:"—",web:""};
+// ══════════════════════════════════════════════
+// LEAFLET MAP
+// ══════════════════════════════════════════════
+const map = L.map('map',{center:[23.5,121.0],zoom:7,zoomControl:true,attributionControl:true});
 
-// ═══════════════════════════════════════════════════════════
-// CANVAS
-// ═══════════════════════════════════════════════════════════
-const mapCanvas = document.getElementById('mapCanvas');
-const mapCtx    = mapCanvas.getContext('2d');
+const TILES = {
+  dark:      ['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png','&copy; OSM &copy; CARTO',{subdomains:'abcd',maxZoom:19}],
+  light:     ['https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png','&copy; OSM &copy; CARTO',{subdomains:'abcd',maxZoom:19}],
+  osm:       ['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png','&copy; OpenStreetMap contributors',{subdomains:'abc',maxZoom:19}],
+  topo:      ['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png','&copy; OpenTopoMap',{subdomains:'abc',maxZoom:17}],
+  satellite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','&copy; Esri',{maxZoom:18}],
+  nlsc:      ['https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}','&copy; 國土測繪中心',{maxZoom:20}],
+};
+let currentTile = L.tileLayer(TILES.dark[0],{attribution:TILES.dark[1],...TILES.dark[2]}).addTo(map);
 
-// Build seismograph strip
-const seismoCanvases = [], seismoCtxs = [], seismoLabels = [], seismoStatuses = [];
-const strip = document.getElementById('seismoStrip');
-STATIONS.forEach(([name,code]) => {
-  const blk = document.createElement('div'); blk.className='seismo-block';
-  const lbl = document.createElement('div'); lbl.className='seismo-label';
-  const st  = document.createElement('span'); st.className='seismo-status'; st.style.color='var(--dim)'; st.textContent='待機';
-  lbl.textContent = `${name} ${code}`; lbl.appendChild(st);
-  const cv  = document.createElement('canvas'); cv.className='seismo-cv';
-  blk.appendChild(lbl); blk.appendChild(cv); strip.appendChild(blk);
-  seismoCanvases.push(cv); seismoCtxs.push(cv.getContext('2d'));
-  seismoLabels.push(lbl); seismoStatuses.push(st);
-});
-
-// ═══════════════════════════════════════════════════════════
-// BUILD EARTHQUAKE LIST
-// ═══════════════════════════════════════════════════════════
-function magClass(m){
-  if(m>=7) return 'm7'; if(m>=6) return 'm6'; if(m>=5) return 'm5';
-  if(m>=4) return 'm4'; return 'm3';
-}
-function formatTime(t){ return t.replace('T',' ').slice(0,16); }
-
-const eqListEl = document.getElementById('eqList');
-eqListEl.innerHTML = '';
-EQ_DB.forEach((eq,i) => {
-  const card = document.createElement('div');
-  card.className = 'eq-card' + (i===0?' active':'');
-  card.innerHTML = `
-    <div class="eq-row1">
-      <span class="eq-mag ${magClass(eq.mag)}">M${parseFloat(eq.mag).toFixed(1)}</span>
-      <span class="eq-time">${formatTime(eq.time)}</span>
-    </div>
-    <div class="eq-loc">${eq.location}</div>
-    <div class="eq-row3">
-      <span class="eq-badge">深度 ${eq.depth}km</span>
-      <span class="eq-badge">震度 ${eq.max_int||'—'}</span>
-    </div>`;
-  card.onclick = () => selectEq(eq, card);
-  eqListEl.appendChild(card);
-});
-
-// Preselect first
-if(EQ_DB.length > 0) selectEq(EQ_DB[0], eqListEl.firstChild, false);
-
-// ═══════════════════════════════════════════════════════════
-// SELECT EARTHQUAKE
-// ═══════════════════════════════════════════════════════════
-function selectEq(eq, cardEl, autoPlay=true){
-  document.querySelectorAll('.eq-card').forEach(c=>c.classList.remove('active'));
-  if(cardEl) cardEl.classList.add('active');
-  epicenter = {
-    lon:     parseFloat(eq.lon),
-    lat:     parseFloat(eq.lat),
-    depth:   parseFloat(eq.depth)||10,
-    mag:     parseFloat(eq.mag)||4,
-    location:eq.location||'',
-    max_int: eq.max_int||'—',
-    web:     eq.web||'',
-  };
-  resetSim();
-  updateHUD();
-  updateStationList();
-  if(autoPlay){ playing=true; lastTs=null; document.getElementById('btnPlay').textContent='⏸ 暫停'; document.getElementById('btnPlay').classList.add('active'); }
-  document.getElementById('eqInfo').textContent = `${eq.location} M${parseFloat(eq.mag).toFixed(1)}`;
+function switchTile(key){
+  map.removeLayer(currentTile);
+  const [url,attr,opts]=TILES[key];
+  currentTile=L.tileLayer(url,{attribution:attr,...opts}).addTo(map);
 }
 
-// ═══════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════
-function geoToPx(lon,lat){
-  const W=mapCanvas.width, H=mapCanvas.height;
-  return [(lon-MAP.lonMin)/(MAP.lonMax-MAP.lonMin)*W,
-          (1-(lat-MAP.latMin)/(MAP.latMax-MAP.latMin))*H];
+// ══════════════════════════════════════════════
+// WAVE CANVAS OVERLAY
+// ══════════════════════════════════════════════
+const mapWrap = document.getElementById('mapWrap');
+const waveCanvas = document.createElement('canvas');
+waveCanvas.style.cssText='position:absolute;top:0;left:0;pointer-events:none;z-index:400;';
+mapWrap.appendChild(waveCanvas);
+const wCtx = waveCanvas.getContext('2d');
+
+function resizeWave(){
+  waveCanvas.width  = mapWrap.clientWidth;
+  waveCanvas.height = mapWrap.clientHeight;
 }
-function geoDist(lon1,lat1,lon2,lat2){
-  const mid = (lat1+lat2)*.5*Math.PI/180;
-  const dx=(lon2-lon1)*111*Math.cos(mid), dy=(lat2-lat1)*111;
-  return Math.sqrt(dx*dx+dy*dy);
-}
+resizeWave();
+window.addEventListener('resize', resizeWave);
+map.on('resize', resizeWave);
+
+// Convert km distance to canvas pixels using Leaflet projection
 function kmToPx(km){
-  const W=mapCanvas.width;
-  return km/((MAP.lonMax-MAP.lonMin)*111*Math.cos(23.5*Math.PI/180))*W;
+  const latDeg = km/111;
+  const p1 = map.latLngToContainerPoint([epicenter.lat, epicenter.lon]);
+  const p2 = map.latLngToContainerPoint([epicenter.lat+latDeg, epicenter.lon]);
+  return Math.abs(p1.y-p2.y);
 }
-function pNoise(t,s){ return Math.sin(t*137.5+s*11)*.5+Math.sin(t*359.8+s*7)*.3+Math.sin(t*811.2+s*3)*.2; }
+function epiPx(){ return map.latLngToContainerPoint([epicenter.lat,epicenter.lon]); }
+
+// ══════════════════════════════════════════════
+// LEAFLET MARKERS
+// ══════════════════════════════════════════════
+let epiMarker = null;
+const stationMarkers = [];
+
+function buildEpiMarker(){
+  if(epiMarker) map.removeLayer(epiMarker);
+  const icon = L.divIcon({
+    html:`<div class="epi-icon-outer"><div class="epi-icon"></div></div>`,
+    className:'', iconSize:[28,28], iconAnchor:[14,14]
+  });
+  epiMarker = L.marker([epicenter.lat,epicenter.lon],{icon,zIndexOffset:1000})
+    .addTo(map)
+    .bindPopup(`<b>${epicenter.location}</b><br>M${epicenter.mag.toFixed(1)} 深${epicenter.depth}km`);
+}
+
+function buildStationMarkers(){
+  stationMarkers.forEach(m=>map.removeLayer(m));
+  stationMarkers.length=0;
+  STATIONS.forEach(([name,code,lon,lat])=>{
+    const icon=L.divIcon({html:`<div class="sta-dot-marker" id="sm-${code}"></div>`,className:'',iconSize:[10,10],iconAnchor:[5,5]});
+    const m=L.marker([lat,lon],{icon}).addTo(map).bindTooltip(name,{permanent:false,direction:'right'});
+    stationMarkers.push(m);
+  });
+}
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let simTime=0, simSpeed=5, playing=false, lastTs=null;
+let epicenter={lat:23.82,lon:121.56,depth:15,mag:7.4,location:'',max_int:'—',web:''};
+
+// ══════════════════════════════════════════════
+// PHYSICS
+// ══════════════════════════════════════════════
+function pNoise(t,s){return Math.sin(t*137.5+s*11)*.5+Math.sin(t*359.8+s*7)*.3+Math.sin(t*811.2+s*3)*.2;}
 function groundMotion(t,dist,dep,mag,seed){
   const hypo=Math.sqrt(dist*dist+dep*dep);
-  const pA=hypo/P_SPD, sA=hypo/S_SPD, suA=dist/SURF_SPD;
+  const pA=hypo/P_SPD,sA=hypo/S_SPD,suA=dist/SURF_SPD;
   const amp=Math.pow(10,.7*(mag-4.5))/Math.max(hypo*.05,1);
   let y=pNoise(t,seed)*.008*amp;
   if(t<pA) return y;
-  const pDt=t-pA; const pEnv=Math.exp(-pDt*.4)*Math.min(1,pDt*6);
-  y+=amp*.35*pEnv*Math.sin(2*Math.PI*pDt*2.2+pNoise(pDt,seed));
+  const pDt=t-pA;y+=amp*.35*Math.exp(-pDt*.4)*Math.min(1,pDt*6)*Math.sin(2*Math.PI*pDt*2.2+pNoise(pDt,seed));
   if(t<sA) return y;
-  const sDt=t-sA; const sEnv=Math.exp(-sDt*.18)*Math.min(1,sDt*4);
-  y+=amp*1.1*sEnv*Math.sin(2*Math.PI*sDt*.75+pNoise(sDt,seed+1));
+  const sDt=t-sA;y+=amp*1.1*Math.exp(-sDt*.18)*Math.min(1,sDt*4)*Math.sin(2*Math.PI*sDt*.75+pNoise(sDt,seed+1));
   if(t<suA||dist<30) return y;
-  const surDt=t-suA; const surEnv=Math.exp(-surDt*.06)*Math.min(1,surDt*2);
-  y+=amp*.7*surEnv*Math.sin(2*Math.PI*surDt*.25+pNoise(surDt,seed+2));
+  const suDt=t-suA;y+=amp*.7*Math.exp(-suDt*.06)*Math.min(1,suDt*2)*Math.sin(2*Math.PI*suDt*.25+pNoise(suDt,seed+2));
   return y;
 }
-
-// ═══════════════════════════════════════════════════════════
-// HUD + STATION LIST
-// ═══════════════════════════════════════════════════════════
-function updateHUD(){
-  document.getElementById('hudMag').textContent   = 'M '+epicenter.mag.toFixed(1);
-  document.getElementById('hudDepth').textContent  = epicenter.depth+' km';
-  document.getElementById('hudInt').textContent    = epicenter.max_int;
-  document.getElementById('hudLoc').textContent    = (epicenter.location||'').slice(0,18)||'—';
-}
-function updateStationList(){
-  const list = document.getElementById('stationList');
-  list.innerHTML = STATIONS.map(([name,code,lon,lat])=>{
-    const d=geoDist(epicenter.lon,epicenter.lat,lon,lat);
-    const hypo=Math.sqrt(d*d+epicenter.depth*epicenter.depth);
-    return `<div class="sta-item">
-      <div class="sta-dot" style="background:var(--p)"></div>
-      <div class="sta-name">${name}</div>
-      <div class="sta-times">P:<span>${(hypo/P_SPD).toFixed(0)}s</span> S:<span>${(hypo/S_SPD).toFixed(0)}s</span></div>
-    </div>`;
-  }).join('');
-}
-updateHUD(); updateStationList();
-
-// ═══════════════════════════════════════════════════════════
-// DRAWING – MAP
-// ═══════════════════════════════════════════════════════════
-function resizeCanvas(){
-  const w=mapCanvas.parentElement.clientWidth, h=mapCanvas.parentElement.clientHeight;
-  mapCanvas.width=w; mapCanvas.height=h;
+function geoDist(lon1,lat1,lon2,lat2){
+  const m=(lat1+lat2)*.5*Math.PI/180;
+  return Math.sqrt(Math.pow((lon2-lon1)*111*Math.cos(m),2)+Math.pow((lat2-lat1)*111,2));
 }
 
-function drawPoly(pts,fill,stroke,lw){
-  mapCtx.beginPath();
-  pts.forEach(([lon,lat],i)=>{ const [x,y]=geoToPx(lon,lat); i?mapCtx.lineTo(x,y):mapCtx.moveTo(x,y); });
-  mapCtx.closePath();
-  if(fill){mapCtx.fillStyle=fill;mapCtx.fill();}
-  if(stroke){mapCtx.strokeStyle=stroke;mapCtx.lineWidth=lw||1;mapCtx.stroke();}
-}
-
-function drawGrid(){
-  mapCtx.strokeStyle='rgba(0,80,120,0.2)'; mapCtx.lineWidth=0.5; mapCtx.setLineDash([2,6]);
-  [120,121,122].forEach(lon=>{ const[x]=geoToPx(lon,MAP.latMin); mapCtx.beginPath(); mapCtx.moveTo(x,0); mapCtx.lineTo(x,mapCanvas.height); mapCtx.stroke(); });
-  [22,23,24,25].forEach(lat=>{ const[,y]=geoToPx(MAP.lonMin,lat); mapCtx.beginPath(); mapCtx.moveTo(0,y); mapCtx.lineTo(mapCanvas.width,y); mapCtx.stroke(); });
-  mapCtx.setLineDash([]);
-  mapCtx.fillStyle='rgba(0,100,140,0.4)'; mapCtx.font='8px Share Tech Mono';
-  [120,121,122].forEach(lon=>{ const[x]=geoToPx(lon,MAP.latMin); mapCtx.fillText(lon+'°E',x+3,mapCanvas.height-4); });
-  [22,23,24,25].forEach(lat=>{ const[,y]=geoToPx(MAP.lonMin,lat); mapCtx.fillText(lat+'°N',3,y-3); });
+// ══════════════════════════════════════════════
+// DRAW WAVE OVERLAY
+// ══════════════════════════════════════════════
+function drawRing(distKm,color,dashed,label){
+  if(distKm<0.5) return;
+  const r=kmToPx(distKm);
+  const {x,y}=epiPx();
+  const fade=Math.max(0,1-distKm/2500);
+  if(fade<=0) return;
+  wCtx.save();
+  wCtx.globalAlpha=fade*.9;
+  wCtx.strokeStyle=color;
+  if(dashed) wCtx.setLineDash([6,5]); else wCtx.setLineDash([]);
+  // Glow pass
+  wCtx.shadowColor=color; wCtx.shadowBlur=14; wCtx.lineWidth=3; wCtx.globalAlpha=fade*.15;
+  wCtx.beginPath(); wCtx.arc(x,y,r,0,Math.PI*2); wCtx.stroke();
+  // Crisp pass
+  wCtx.shadowBlur=0; wCtx.lineWidth=1.5; wCtx.globalAlpha=fade*.9;
+  wCtx.beginPath(); wCtx.arc(x,y,r,0,Math.PI*2); wCtx.stroke();
+  wCtx.setLineDash([]);
+  // Label
+  if(r>20&&r<waveCanvas.width*.9){
+    wCtx.font='bold 9px Share Tech Mono';
+    wCtx.fillStyle=color;wCtx.globalAlpha=fade*.8;
+    wCtx.fillText(label,x-wCtx.measureText(label).width/2,y-r-4);
+  }
+  wCtx.restore();
 }
 
 function drawIntensity(){
-  const [ex,ey]=geoToPx(epicenter.lon,epicenter.lat);
-  const r=kmToPx(S_SPD*simTime); if(r<2) return;
+  const dist=S_SPD*simTime; if(dist<0.5) return;
+  const r=kmToPx(dist); if(r<2) return;
+  const {x,y}=epiPx();
   const a=Math.min(1,(epicenter.mag-3)/4);
-  const g=mapCtx.createRadialGradient(ex,ey,0,ex,ey,r);
-  g.addColorStop(0,  `rgba(255,23,68,${.4*a})`);
-  g.addColorStop(.15,`rgba(255,100,10,${.28*a})`);
-  g.addColorStop(.4, `rgba(255,200,0,${.14*a})`);
-  g.addColorStop(.7, `rgba(0,180,80,${.06*a})`);
-  g.addColorStop(1,  'rgba(0,0,0,0)');
-  mapCtx.save(); mapCtx.globalCompositeOperation='screen';
-  mapCtx.fillStyle=g; mapCtx.beginPath(); mapCtx.arc(ex,ey,r,0,Math.PI*2); mapCtx.fill();
-  mapCtx.restore();
+  const g=wCtx.createRadialGradient(x,y,0,x,y,r);
+  g.addColorStop(0,`rgba(255,23,68,${.35*a})`);
+  g.addColorStop(.2,`rgba(255,100,10,${.22*a})`);
+  g.addColorStop(.5,`rgba(255,200,0,${.1*a})`);
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  wCtx.save(); wCtx.globalCompositeOperation='screen';
+  wCtx.fillStyle=g; wCtx.beginPath(); wCtx.arc(x,y,r,0,Math.PI*2); wCtx.fill();
+  wCtx.restore();
 }
 
-function drawWaveRing(spd,color,dashed,label){
-  const d=spd*simTime; if(d<1) return;
-  const r=kmToPx(d);
-  const [ex,ey]=geoToPx(epicenter.lon,epicenter.lat);
-  const fade=Math.max(0,1-d/2500); if(fade<=0) return;
-  mapCtx.save();
-  // Outer glow
-  mapCtx.strokeStyle=color; mapCtx.lineWidth=4; mapCtx.globalAlpha=fade*.12;
-  if(dashed) mapCtx.setLineDash([6,4]); else mapCtx.setLineDash([]);
-  mapCtx.shadowColor=color; mapCtx.shadowBlur=12;
-  mapCtx.beginPath(); mapCtx.arc(ex,ey,r,0,Math.PI*2); mapCtx.stroke();
-  // Inner crisp ring
-  mapCtx.lineWidth=1.2; mapCtx.globalAlpha=fade*.9; mapCtx.shadowBlur=0;
-  mapCtx.beginPath(); mapCtx.arc(ex,ey,r,0,Math.PI*2); mapCtx.stroke();
-  mapCtx.setLineDash([]);
-  // Label
-  if(r>18 && r<mapCanvas.width*.9){
-    mapCtx.globalAlpha=fade*.8; mapCtx.fillStyle=color; mapCtx.font='bold 9px Share Tech Mono';
-    const lx=ex, ly=ey-r-4;
-    if(ly>6) mapCtx.fillText(label,lx-mapCtx.measureText(label).width*.5,ly);
-  }
-  mapCtx.restore();
+function drawWaveFrame(){
+  wCtx.clearRect(0,0,waveCanvas.width,waveCanvas.height);
+  drawIntensity();
+  drawRing(SURF_SPD*simTime,'#ffc400',true,'表面波');
+  drawRing(S_SPD*simTime,   '#ff4500',false,'S波');
+  drawRing(P_SPD*simTime,   '#29d9ff',false,'P波');
 }
 
-function drawEpicenter(){
-  const [ex,ey]=geoToPx(epicenter.lon,epicenter.lat);
-  const t=simTime;
-  mapCtx.save();
-  // Outer rotating ring
-  const angle=t*2; const pulse=.8+.2*Math.sin(t*6);
-  mapCtx.strokeStyle='rgba(255,23,68,.5)'; mapCtx.lineWidth=1;
-  mapCtx.setLineDash([4,6]);
-  mapCtx.beginPath(); mapCtx.arc(ex,ey,16*pulse,angle,angle+Math.PI*2); mapCtx.stroke();
-  mapCtx.setLineDash([]);
-  // Inner fill
-  const g=mapCtx.createRadialGradient(ex,ey,0,ex,ey,6);
-  g.addColorStop(0,'rgba(255,100,100,0.9)'); g.addColorStop(1,'rgba(255,23,68,0.5)');
-  mapCtx.fillStyle=g;
-  mapCtx.shadowColor='#ff1744'; mapCtx.shadowBlur=15;
-  mapCtx.beginPath(); mapCtx.arc(ex,ey,5,0,Math.PI*2); mapCtx.fill();
-  // Crosshair
-  mapCtx.strokeStyle='rgba(255,100,100,.6)'; mapCtx.lineWidth=.7; mapCtx.shadowBlur=0;
-  mapCtx.beginPath(); mapCtx.moveTo(ex-12,ey); mapCtx.lineTo(ex+12,ey);
-  mapCtx.moveTo(ex,ey-12); mapCtx.lineTo(ex,ey+12); mapCtx.stroke();
-  mapCtx.restore();
-}
-
-function drawStations(){
+// Update station marker colors based on wave arrival
+function updateStationDots(){
   STATIONS.forEach(([name,code,lon,lat],i)=>{
-    const [sx,sy]=geoToPx(lon,lat);
     const dist=geoDist(epicenter.lon,epicenter.lat,lon,lat);
     const hypo=Math.sqrt(dist*dist+epicenter.depth*epicenter.depth);
     const hasP=simTime>=hypo/P_SPD, hasS=simTime>=hypo/S_SPD;
-    const col = hasS?'var(--s)' : hasP?'var(--p)' : 'rgba(255,255,255,0.7)';
-    mapCtx.save();
-    mapCtx.shadowColor=col; mapCtx.shadowBlur=hasP?8:0;
-    mapCtx.strokeStyle=col; mapCtx.fillStyle=col.includes('--')
-      ? (hasS?'#ff4500':hasP?'#29d9ff':'rgba(255,255,255,.6)') : col;
-    mapCtx.lineWidth=1.5;
-    mapCtx.beginPath(); mapCtx.arc(sx,sy,4.5,0,Math.PI*2); mapCtx.fill(); mapCtx.stroke();
-    mapCtx.shadowBlur=0;
-    mapCtx.fillStyle=hasS?'#ff8060':hasP?'#80eaff':'#aaccdd';
-    mapCtx.font='bold 9px Share Tech Mono';
-    mapCtx.fillText(name,sx+7,sy+4);
-    mapCtx.restore();
-    // Update seismograph status label
+    const el=document.getElementById(`sm-${code}`);
+    if(el){
+      el.className='sta-dot-marker'+(hasS?' arrived-s':hasP?' arrived-p':'');
+    }
     if(seismoStatuses[i]){
-      if(hasS){ seismoStatuses[i].textContent='S波'; seismoStatuses[i].style.color='var(--s)'; }
-      else if(hasP){ seismoStatuses[i].textContent='P波'; seismoStatuses[i].style.color='var(--p)'; }
-      else { seismoStatuses[i].textContent='待機'; seismoStatuses[i].style.color='var(--dim)'; }
+      if(hasS){seismoStatuses[i].textContent='S波到達';seismoStatuses[i].style.color='var(--s)';}
+      else if(hasP){seismoStatuses[i].textContent='P波到達';seismoStatuses[i].style.color='var(--p)';}
+      else{seismoStatuses[i].textContent='待機';seismoStatuses[i].style.color='var(--dim)';}
     }
   });
 }
 
-function drawMap(){
-  resizeCanvas();
-  const W=mapCanvas.width, H=mapCanvas.height;
-  // Ocean background – radial gradient gives subtle depth
-  const bg=mapCtx.createRadialGradient(W*.5,H*.5,0,W*.5,H*.5,Math.max(W,H)*.7);
-  bg.addColorStop(0,'#020f1f'); bg.addColorStop(1,'#01080f');
-  mapCtx.fillStyle=bg; mapCtx.fillRect(0,0,W,H);
-  drawGrid();
-  drawIntensity();
-  // Land
-  drawPoly(TAIWAN,'#0d1f14','rgba(0,220,120,.25)',1);
-  drawPoly(PENGHU,'#0d1f14','rgba(0,220,120,.2)');
-  drawPoly(GREEN_I,'#0d1f14','rgba(0,220,120,.15)');
-  drawPoly(ORCHID, '#0d1f14','rgba(0,220,120,.15)');
-  // Waves (back to front)
-  drawWaveRing(SURF_SPD,'var(--surf)',true,'表面波');
-  drawWaveRing(S_SPD,   'var(--s)',  false,'S 波');
-  drawWaveRing(P_SPD,   'var(--p)',  false,'P 波');
-  drawStations();
-  drawEpicenter();
-  // Scale bar
-  const bKm=100, bPx=kmToPx(bKm), bx=W-bPx-14, by=H-14;
-  mapCtx.save();
-  mapCtx.strokeStyle='rgba(100,180,220,.5)'; mapCtx.lineWidth=1.5;
-  mapCtx.beginPath(); mapCtx.moveTo(bx,by); mapCtx.lineTo(bx+bPx,by); mapCtx.stroke();
-  [bx,bx+bPx].forEach(x=>{ mapCtx.beginPath(); mapCtx.moveTo(x,by-4); mapCtx.lineTo(x,by+4); mapCtx.stroke(); });
-  mapCtx.fillStyle='rgba(100,180,220,.5)'; mapCtx.font='8px Share Tech Mono';
-  mapCtx.fillText('100 km',bx+bPx/2-14,by-6);
-  mapCtx.restore();
-}
+// ══════════════════════════════════════════════
+// SEISMOGRAPH
+// ══════════════════════════════════════════════
+const seismoCanvases=[],seismoCtxs=[],seismoStatuses=[];
+const strip=document.getElementById('seismoStrip');
+STATIONS.forEach(([name,code])=>{
+  const blk=document.createElement('div'); blk.className='seismo-block';
+  const lbl=document.createElement('div'); lbl.className='seismo-label';
+  const st=document.createElement('span'); st.className='seismo-status'; st.textContent='待機';
+  lbl.textContent=`${name} ${code}`; lbl.appendChild(st);
+  const cv=document.createElement('canvas'); cv.className='seismo-cv';
+  blk.appendChild(lbl); blk.appendChild(cv); strip.appendChild(blk);
+  seismoCanvases.push(cv); seismoCtxs.push(cv.getContext('2d')); seismoStatuses.push(st);
+});
 
-// ═══════════════════════════════════════════════════════════
-// DRAWING – SEISMOGRAPHS
-// ═══════════════════════════════════════════════════════════
-function drawSeismo(ctx,cv,stIdx){
-  const W=cv.offsetWidth||cv.clientWidth||140, H=cv.offsetHeight||cv.clientHeight||80;
+function drawSeismo(ctx,cv,idx){
+  const W=cv.offsetWidth||120, H=cv.offsetHeight||70;
   cv.width=W; cv.height=H;
-  const [,,sLon,sLat]=STATIONS[stIdx];
+  const [,,sLon,sLat]=STATIONS[idx];
   const dist=geoDist(epicenter.lon,epicenter.lat,sLon,sLat);
-  const seed=stIdx*7.3, midY=H/2, maxA=H*.38;
+  const seed=idx*7.3, midY=H/2, maxA=H*.38;
   const hypo=Math.sqrt(dist*dist+epicenter.depth*epicenter.depth);
-  const pArr=hypo/P_SPD, sArr=hypo/S_SPD, sufArr=dist/SURF_SPD;
+  const pArr=hypo/P_SPD, sArr=hypo/S_SPD, suArr=dist/SURF_SPD;
   const tStart=Math.max(0,simTime-SEISMO_WIN);
-  function tToX(t){return Math.max(0,(t-tStart)/SEISMO_WIN*W);}
+  const tToX=t=>Math.max(0,(t-tStart)/SEISMO_WIN*W);
 
-  // Background
   ctx.fillStyle='#010810'; ctx.fillRect(0,0,W,H);
-  // Grid
-  ctx.strokeStyle='rgba(0,229,255,.06)'; ctx.lineWidth=.4; ctx.setLineDash([1,4]);
+  ctx.strokeStyle='rgba(0,229,255,.05)'; ctx.lineWidth=.4; ctx.setLineDash([1,4]);
   [.25,.5,.75].forEach(f=>{ctx.beginPath();ctx.moveTo(0,H*f);ctx.lineTo(W,H*f);ctx.stroke();});
   ctx.setLineDash([]);
-  // Arrival markers
-  function drawArr(arr,col,lbl){
-    const x=tToX(arr); if(x<=0||x>=W) return;
-    ctx.save(); ctx.strokeStyle=col; ctx.globalAlpha=.5; ctx.lineWidth=1; ctx.setLineDash([2,3]);
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
-    ctx.setLineDash([]); ctx.fillStyle=col; ctx.globalAlpha=.8;
-    ctx.font='7px Share Tech Mono'; ctx.fillText(lbl,x+2,8);
-    ctx.restore();
-  }
-  drawArr(pArr,'var(--p)','P');
-  drawArr(sArr,'var(--s)','S');
-  if(dist>30) drawArr(sufArr,'var(--surf)','R');
 
-  // Trace with gradient fill
-  ctx.save();
-  // Build path
-  ctx.beginPath();
-  let first=true;
+  [[pArr,'var(--p)','P'],[sArr,'var(--s)','S'],[suArr,'var(--surf)','R']].forEach(([arr,col,lbl])=>{
+    const x=tToX(arr); if(x<=0||x>W) return;
+    ctx.save();ctx.strokeStyle=col;ctx.globalAlpha=.5;ctx.lineWidth=1;ctx.setLineDash([2,3]);
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle=col;ctx.globalAlpha=.8;ctx.font='7px Share Tech Mono';ctx.fillText(lbl,x+2,8);ctx.restore();
+  });
+
+  ctx.beginPath(); let first=true;
   for(let px=0;px<=W;px++){
-    const t=tStart+px/W*SEISMO_WIN;
-    if(t>simTime) break;
+    const t=tStart+px/W*SEISMO_WIN; if(t>simTime) break;
     const d=groundMotion(t,dist,epicenter.depth,epicenter.mag,seed);
     const y=midY-Math.max(-maxA,Math.min(maxA,d*maxA*.55));
     if(first){ctx.moveTo(px,y);first=false;}else ctx.lineTo(px,y);
   }
-  // Stroke: glowing green
-  ctx.strokeStyle='#00ff88'; ctx.lineWidth=1; ctx.shadowColor='#00ff88'; ctx.shadowBlur=4;
-  ctx.stroke();
-  ctx.shadowBlur=0; ctx.restore();
-
-  // Current time needle
-  ctx.save(); ctx.strokeStyle='rgba(0,229,255,.4)'; ctx.lineWidth=1;
-  ctx.setLineDash([2,2]); ctx.beginPath(); ctx.moveTo(W,0); ctx.lineTo(W,H); ctx.stroke();
-  ctx.restore();
+  ctx.strokeStyle='#00ff88';ctx.lineWidth=1;ctx.shadowColor='#00ff88';ctx.shadowBlur=4;ctx.stroke();
+  ctx.shadowBlur=0;
 }
 
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// EARTHQUAKE SELECTOR
+// ══════════════════════════════════════════════
+function magClass(m){if(m>=7)return 'm7';if(m>=6)return 'm6';if(m>=5)return 'm5';if(m>=4)return 'm4';return 'm3';}
+const eqListEl=document.getElementById('eqList');
+eqListEl.innerHTML='';
+EQ_DB.forEach((eq,i)=>{
+  const card=document.createElement('div');card.className='eq-card'+(i===0?' active':'');
+  card.innerHTML=`<div class="eq-row1"><span class="eq-mag ${magClass(eq.mag)}">M${parseFloat(eq.mag).toFixed(1)}</span><span class="eq-time">${eq.time.slice(0,16)}</span></div><div class="eq-loc">${eq.location}</div><div class="eq-row3"><span class="eq-badge">深度 ${eq.depth}km</span><span class="eq-badge">震度 ${eq.max_int||'—'}</span></div>`;
+  card.onclick=()=>selectEq(eq,card);
+  eqListEl.appendChild(card);
+});
+
+function selectEq(eq,cardEl,autoPlay=true){
+  document.querySelectorAll('.eq-card').forEach(c=>c.classList.remove('active'));
+  if(cardEl) cardEl.classList.add('active');
+  epicenter={lat:+eq.lat,lon:+eq.lon,depth:+eq.depth||10,mag:+eq.mag||4,location:eq.location||'',max_int:eq.max_int||'—',web:eq.web||''};
+  resetSim();
+  buildEpiMarker();
+  map.flyTo([epicenter.lat,epicenter.lon],7,{duration:1});
+  updateHUD(); updateStationList();
+  document.getElementById('eqInfo').textContent=`${eq.location} M${parseFloat(eq.mag).toFixed(1)}`;
+  if(autoPlay){playing=true;lastTs=null;document.getElementById('btnPlay').textContent='⏸ 暫停';document.getElementById('btnPlay').classList.add('active');}
+}
+
+function updateHUD(){
+  document.getElementById('hudMag').textContent='M '+epicenter.mag.toFixed(1);
+  document.getElementById('hudDepth').textContent=epicenter.depth+' km';
+  document.getElementById('hudInt').textContent=epicenter.max_int;
+  document.getElementById('hudLoc').textContent=(epicenter.location||'').slice(0,18)||'—';
+}
+function updateStationList(){
+  document.getElementById('stationList').innerHTML=STATIONS.map(([name,code,lon,lat])=>{
+    const d=geoDist(epicenter.lon,epicenter.lat,lon,lat);
+    const h=Math.sqrt(d*d+epicenter.depth*epicenter.depth);
+    return `<div class="sta-item"><div class="sta-dot" style="background:var(--p)" id="dot-${code}"></div><div class="sta-name">${name}</div><div class="sta-times">P:<span>${(h/P_SPD).toFixed(0)}s</span> S:<span>${(h/S_SPD).toFixed(0)}s</span></div></div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// CONTROLS
+// ══════════════════════════════════════════════
+function togglePlay(){
+  playing=!playing;lastTs=null;
+  const btn=document.getElementById('btnPlay');
+  btn.textContent=playing?'⏸ 暫停':'▶ 播放';btn.classList.toggle('active',playing);
+}
+function resetSim(){
+  simTime=0;lastTs=null;playing=false;
+  document.getElementById('btnPlay').textContent='▶ 播放';
+  document.getElementById('btnPlay').classList.remove('active');
+}
+
+// ══════════════════════════════════════════════
 // ANIMATION LOOP
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════
 function frame(ts){
-  if(playing){
-    if(lastTs!==null) simTime+=((ts-lastTs)/1000)*simSpeed;
-    lastTs=ts;
-  }
-  drawMap();
+  if(playing){if(lastTs!==null)simTime+=((ts-lastTs)/1000)*simSpeed;lastTs=ts;}
+  drawWaveFrame();
+  updateStationDots();
   seismoCanvases.forEach((cv,i)=>drawSeismo(seismoCtxs[i],cv,i));
-  const s=simTime.toFixed(0).padStart(3,'0');
-  document.getElementById('timerDisplay').textContent=`T+${s}s`;
+  document.getElementById('timerDisplay').textContent='T+'+simTime.toFixed(0).padStart(3,'0')+'s';
   requestAnimationFrame(frame);
 }
 
-// ═══════════════════════════════════════════════════════════
-// CONTROLS
-// ═══════════════════════════════════════════════════════════
-function togglePlay(){
-  playing=!playing; lastTs=null;
-  const btn=document.getElementById('btnPlay');
-  btn.textContent=playing?'⏸ 暫停':'▶ 播放';
-  btn.classList.toggle('active',playing);
-}
-function resetSim(){
-  simTime=0; lastTs=null; playing=false;
-  const btn=document.getElementById('btnPlay');
-  btn.textContent='▶ 播放'; btn.classList.remove('active');
-}
-
-// ═══════════════════════════════════════════════════════════
-// START
-// ═══════════════════════════════════════════════════════════
-window.addEventListener('resize',resizeCanvas);
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+buildStationMarkers();
+if(EQ_DB.length>0) selectEq(EQ_DB[0],eqListEl.firstChild,false);
+map.whenReady(()=>{setTimeout(()=>map.invalidateSize(),100);});
 requestAnimationFrame(frame);
 </script>
 </body>

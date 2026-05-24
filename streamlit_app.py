@@ -855,17 +855,84 @@ with tab_town:
                 st.json(raw_town)
 
 
+
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 5：震波模擬
+# TAB 5：震波模擬（注入有感地震資料）
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_wave:
     st.write("## 📡 地震震波模擬")
-    st.caption("點擊地圖設定震央 ｜ 選擇歷史大地震 ｜ 調整規模與深度觀察震波傳遞")
+    st.caption("從有感地震報告中選取一筆，觀察 P 波、S 波、表面波的傳遞過程。")
+
+    import json as _json_wave
+    import streamlit.components.v1 as _components
+
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def get_eq_for_wave(api_key: str, limit: int = 50) -> list:
+        """從 E-A0015-001 + E-A0016-001 取得地震清單供模擬使用"""
+        all_eq = []
+        for ds_id in ["E-A0015-001", "E-A0016-001"]:
+            data = api_get(ds_id, api_key, {"limit": limit})
+            if not data:
+                continue
+            for eq in safe_list(data.get("records", {}).get("Earthquake", [])):
+                try:
+                    info    = eq["EarthquakeInfo"]
+                    epi     = info["Epicenter"]
+                    mag_i   = info["EarthquakeMagnitude"]
+                    shaking = safe_list(eq.get("Intensity", {}).get("ShakingArea"))
+                    max_int = shaking[0].get("AreaIntensity", "未知") if shaking else "未知"
+                    all_eq.append({
+                        "no":        str(eq.get("EarthquakeNo", "")),
+                        "time":      info.get("OriginTime", ""),
+                        "location":  epi.get("Location", ""),
+                        "lat":       float(epi.get("EpicenterLatitude",  23.5)),
+                        "lon":       float(epi.get("EpicenterLongitude", 121.0)),
+                        "depth":     float(info.get("FocalDepth", 10)),
+                        "mag":       float(mag_i.get("MagnitudeValue", 4.0)),
+                        "max_int":   max_int,
+                        "web":       eq.get("Web", ""),
+                        "report_img":eq.get("ReportImageURI", ""),
+                    })
+                except Exception:
+                    continue
+
+        # 去重複、按時間降序
+        seen, unique = set(), []
+        for eq in sorted(all_eq, key=lambda x: x["time"], reverse=True):
+            k = (eq["time"], eq["lat"], eq["lon"])
+            if k not in seen:
+                seen.add(k)
+                unique.append(eq)
+        return unique
+
+    with st.spinner("載入有感地震資料以供模擬…"):
+        wave_eq_list = get_eq_for_wave(api_key, 50)
+
+    if not wave_eq_list:
+        st.warning("⚠️ 無法從 API 取得地震資料，將使用內建歷史地震預設值。")
+
     try:
-        import streamlit.components.v1 as components
-        with open("earthquake_wave_simulation.html", "r", encoding="utf-8") as f:
-            components.html(f.read(), height=750, scrolling=False)
+        with open("earthquake_wave_simulation.html", "r", encoding="utf-8") as _f:
+            _html = _f.read()
+
+        # 將 API 地震清單注入 HTML（取代佔位符）
+        _eq_json = _json_wave.dumps(wave_eq_list, ensure_ascii=False)
+        _html = _html.replace(
+            "/* __EQ_DB_PLACEHOLDER__ */",
+            f"const INJECTED_DB = {_eq_json};"
+        )
+
+        _components.html(_html, height=820, scrolling=False)
+
+        # 若有選取的地震，顯示報告連結
+        if wave_eq_list:
+            st.caption(
+                f"共載入 {len(wave_eq_list)} 筆有感地震報告 "
+                "｜ 點擊左側清單選取地震 ｜ 按 ▶ 播放震波模擬"
+            )
+
     except FileNotFoundError:
-        st.error("找不到 earthquake_wave_simulation.html，請確認檔案在 repo 根目錄。")
-    except Exception as e:
-        st.error(f"載入動畫時發生錯誤：{e}")
+        st.error("❌ 找不到 `earthquake_wave_simulation.html`，請確認檔案在 repo 根目錄。")
+    except Exception as _e:
+        st.error(f"❌ 載入模擬時發生錯誤：{_e}")
+

@@ -20,7 +20,7 @@ body::after{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);
 }
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:12px;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
 
 /* ── Header ──────────────────────────────────────────────── */
 header{
@@ -29,10 +29,10 @@ header{
   background:linear-gradient(90deg,#010c18,#020f20,#010c18);
   border-bottom:1px solid var(--rim);position:relative;z-index:600;
 }
-.hdr-title{font-family:var(--orb);font-size:13px;font-weight:600;color:var(--accent);letter-spacing:3px;text-shadow:var(--glow-c);}
+.hdr-title{font-family:var(--orb);font-size:15px;font-weight:600;color:var(--accent);letter-spacing:3px;text-shadow:var(--glow-c);}
 .hdr-right{display:flex;align-items:center;gap:20px;}
-.hdr-chip{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:1px;}
-#timerDisplay{font-family:var(--orb);font-size:22px;font-weight:900;color:var(--accent);letter-spacing:4px;text-shadow:var(--glow-c);min-width:110px;text-align:right;}
+.hdr-chip{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:1px;}
+#timerDisplay{font-family:var(--orb);font-size:26px;font-weight:900;color:var(--accent);letter-spacing:4px;text-shadow:var(--glow-c);min-width:120px;text-align:right;}
 
 /* ── Main layout ─────────────────────────────────────────── */
 .main{flex:1;display:flex;overflow:hidden;min-height:0;}
@@ -40,7 +40,7 @@ header{
 /* ── Left Panel ──────────────────────────────────────────── */
 .left-panel{width:260px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--rim);display:flex;flex-direction:column;overflow:hidden;z-index:600;}
 .lp-section{border-bottom:1px solid rgba(0,229,255,.08);padding:10px 12px;}
-.lp-title{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+.lp-title{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
 .eq-list{flex:1;overflow-y:auto;padding:6px 8px;scrollbar-width:thin;scrollbar-color:var(--dim) transparent;}
 .eq-card{padding:8px 10px;margin-bottom:5px;border:1px solid var(--rim);border-radius:4px;cursor:pointer;transition:all .2s;background:rgba(0,180,255,.04);position:relative;}
 .eq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent;transition:background .2s;}
@@ -49,32 +49,32 @@ header{
 .eq-card.active{border-color:var(--accent);background:rgba(0,229,255,.09);box-shadow:0 0 12px rgba(0,229,255,.15);}
 .eq-card.active::before{background:var(--accent);box-shadow:var(--glow-c);}
 .eq-row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
-.eq-mag{font-family:var(--orb);font-size:15px;font-weight:600;padding:1px 6px;border-radius:2px;}
+.eq-mag{font-family:var(--orb);font-size:17px;font-weight:600;padding:1px 6px;border-radius:2px;}
 .eq-mag.m7{color:#ff1744;background:rgba(255,23,68,.15);} .eq-mag.m6{color:#ff6d00;background:rgba(255,109,0,.12);}
 .eq-mag.m5{color:#ffab00;background:rgba(255,171,0,.12);} .eq-mag.m4{color:#76ff03;background:rgba(118,255,3,.1);}
 .eq-mag.m3{color:var(--p);background:rgba(41,217,255,.1);}
-.eq-time{font-family:var(--mono);font-size:9px;color:var(--dim);}
-.eq-loc{font-size:10px;color:var(--text);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eq-time{font-family:var(--mono);font-size:11px;color:var(--dim);}
+.eq-loc{font-size:12px;color:var(--text);margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .eq-row3{display:flex;gap:6px;}
-.eq-badge{font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:2px;border:1px solid var(--rim);color:var(--dim);}
+.eq-badge{font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:2px;border:1px solid var(--rim);color:var(--dim);}
 .slider-row{margin-bottom:8px;}
-.slider-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-bottom:3px;}
+.slider-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:3px;}
 .slider-lbl span{color:var(--bright);font-family:var(--mono);}
 input[type=range]{width:100%;height:2px;appearance:none;background:linear-gradient(90deg,var(--accent),#0080ff);border-radius:2px;outline:none;}
 input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:var(--glow-c);}
 .btn-row{display:flex;gap:6px;margin-bottom:8px;}
-.btn{flex:1;padding:6px;border:1px solid var(--rim);background:transparent;color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:1px;cursor:pointer;border-radius:2px;transition:all .2s;}
+.btn{flex:1;padding:6px;border:1px solid var(--rim);background:transparent;color:var(--accent);font-family:var(--mono);font-size:13px;letter-spacing:1px;cursor:pointer;border-radius:2px;transition:all .2s;}
 .btn:hover{background:rgba(0,229,255,.1);border-color:var(--accent);}
 .btn.active{background:var(--accent);color:#010c18;}
 .btn-play{flex:2;}
 .sta-item{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,229,255,.05);}
 .sta-dot{width:7px;height:7px;border-radius:50%;margin-right:6px;flex-shrink:0;transition:background .3s;}
-.sta-name{color:var(--text);font-size:10px;flex:1;}
-.sta-times{font-family:var(--mono);font-size:9px;color:var(--dim);}
+.sta-name{color:var(--text);font-size:12px;flex:1;}
+.sta-times{font-family:var(--mono);font-size:11px;color:var(--dim);}
 .sta-times span{color:var(--bright);}
 
 /* ── Tile selector ───────────────────────────────────────── */
-.tile-select{width:100%;padding:4px 6px;background:#020d1a;border:1px solid var(--rim);color:var(--text);font-family:var(--mono);font-size:10px;border-radius:2px;outline:none;cursor:pointer;}
+.tile-select{width:100%;padding:4px 6px;background:#020d1a;border:1px solid var(--rim);color:var(--text);font-family:var(--mono);font-size:12px;border-radius:2px;outline:none;cursor:pointer;}
 
 /* ── Map container ───────────────────────────────────────── */
 #mapWrap{flex:1;position:relative;min-height:0;min-width:0;}
@@ -120,8 +120,8 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;b
   border-radius:4px;padding:10px 14px;backdrop-filter:blur(8px);min-width:160px;
 }
 .hud-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;}
-.hud-label{font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
-.hud-val{font-family:var(--orb);font-size:14px;color:var(--accent);}
+.hud-label{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+.hud-val{font-family:var(--orb);font-size:16px;color:var(--accent);}
 
 /* Wave legend */
 .wave-legend{
@@ -129,7 +129,7 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;b
   background:var(--panel);border:1px solid var(--rim);
   border-radius:4px;padding:8px 12px;backdrop-filter:blur(8px);
 }
-.leg-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:10px;color:var(--text);}
+.leg-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;color:var(--text);}
 .leg-line{width:24px;height:2px;border-radius:1px;flex-shrink:0;}
 
 /* ── Seismograph strip ───────────────────────────────────── */
@@ -139,8 +139,8 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;b
 }
 .seismo-block{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid rgba(0,229,255,.06);padding:4px 6px;}
 .seismo-block:last-child{border-right:none;}
-.seismo-label{font-family:var(--mono);font-size:8px;color:var(--accent);letter-spacing:1px;margin-bottom:2px;display:flex;justify-content:space-between;}
-.seismo-status{font-size:8px;font-family:var(--mono);color:var(--dim);}
+.seismo-label{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:2px;display:flex;justify-content:space-between;}
+.seismo-status{font-size:10px;font-family:var(--mono);color:var(--dim);}
 .seismo-cv{flex:1;width:100%;border:1px solid rgba(0,229,255,.08);border-radius:2px;background:#010810;}
 </style>
 </head>
@@ -232,11 +232,52 @@ const EQ_DB = (typeof INJECTED_DB!=='undefined'&&INJECTED_DB&&INJECTED_DB.length
 // CONSTANTS
 // ══════════════════════════════════════════════
 const P_SPD=6.0, S_SPD=3.5, SURF_SPD=2.5, SEISMO_WIN=120;
-const STATIONS=[
-  ["台北","TPE",121.56,25.04],["宜蘭","ILA",121.75,24.70],
-  ["花蓮","HLN",121.61,23.97],["台中","TCH",120.67,24.15],
-  ["台南","TNN",120.20,22.99],["高雄","KHH",120.31,22.63],
+// ══════════════════════════════════════════════
+// STATIONS
+// SEISMO_STATIONS: 6 個代表站（地震儀顯示）
+// MAP_STATIONS:    全台 22 縣市（地圖標記 + 抵達列表）
+// ══════════════════════════════════════════════
+const SEISMO_STATIONS = [
+  ["台北","TPE",121.56,25.04],
+  ["宜蘭","ILA",121.75,24.70],
+  ["花蓮","HLN",121.61,23.97],
+  ["台中","TCH",120.67,24.15],
+  ["台南","TNN",120.20,22.99],
+  ["高雄","KHH",120.31,22.63],
 ];
+// 為了讓 seismograph 的程式碼仍使用 STATIONS 名稱：
+const STATIONS = SEISMO_STATIONS;
+
+const MAP_STATIONS = [
+  // 北部
+  ["基隆","KEE",121.74,25.13],
+  ["台北","TPE",121.56,25.04],
+  ["新北","NTP",121.45,25.01],
+  ["桃園","TYN",121.30,24.99],
+  ["新竹市","HCC",120.97,24.81],
+  ["新竹縣","HCH",121.00,24.70],
+  // 中部
+  ["苗栗","MIA",120.82,24.56],
+  ["台中","TCH",120.67,24.15],
+  ["彰化","CHA",120.52,24.07],
+  ["南投","NAN",120.99,23.96],
+  ["雲林","YUN",120.39,23.71],
+  // 南部
+  ["嘉義市","CYC",120.45,23.47],
+  ["嘉義縣","CYH",120.57,23.46],
+  ["台南","TNN",120.20,22.99],
+  ["高雄","KHH",120.31,22.63],
+  ["屏東","PIG",120.49,22.67],
+  // 東部
+  ["台東","TTT",121.11,22.75],
+  ["花蓮","HLN",121.61,23.97],
+  ["宜蘭","ILA",121.75,24.70],
+  // 直轄市補充
+  ["基隆","KEE",121.74,25.13], // 已在北部，跳過重複
+  // 離島
+  ["澎湖","MZG",119.57,23.57],
+  ["金門","KMN",118.32,24.43],
+].filter((v,i,a)=>a.findIndex(x=>x[1]===v[1])===i); // 去重複
 
 // ══════════════════════════════════════════════
 // LEAFLET MAP
@@ -305,9 +346,10 @@ function buildEpiMarker(){
 function buildStationMarkers(){
   stationMarkers.forEach(m=>map.removeLayer(m));
   stationMarkers.length=0;
-  STATIONS.forEach(([name,code,lon,lat])=>{
+  MAP_STATIONS.forEach(([name,code,lon,lat])=>{
     const icon=L.divIcon({html:`<div class="sta-dot-marker" id="sm-${code}"></div>`,className:'',iconSize:[10,10],iconAnchor:[5,5]});
-    const m=L.marker([lat,lon],{icon}).addTo(map).bindTooltip(name,{permanent:false,direction:'right'});
+    const m=L.marker([lat,lon],{icon}).addTo(map)
+      .bindTooltip(name,{permanent:false,direction:'right',className:'leaflet-tooltip'});
     stationMarkers.push(m);
   });
 }
@@ -394,14 +436,19 @@ function drawWaveFrame(){
 
 // Update station marker colors based on wave arrival
 function updateStationDots(){
-  STATIONS.forEach(([name,code,lon,lat],i)=>{
+  // Map markers: all 22 counties
+  MAP_STATIONS.forEach(([name,code,lon,lat])=>{
     const dist=geoDist(epicenter.lon,epicenter.lat,lon,lat);
     const hypo=Math.sqrt(dist*dist+epicenter.depth*epicenter.depth);
     const hasP=simTime>=hypo/P_SPD, hasS=simTime>=hypo/S_SPD;
     const el=document.getElementById(`sm-${code}`);
-    if(el){
-      el.className='sta-dot-marker'+(hasS?' arrived-s':hasP?' arrived-p':'');
-    }
+    if(el) el.className='sta-dot-marker'+(hasS?' arrived-s':hasP?' arrived-p':'');
+  });
+  // Seismograph status: only SEISMO_STATIONS
+  SEISMO_STATIONS.forEach(([name,code,lon,lat],i)=>{
+    const dist=geoDist(epicenter.lon,epicenter.lat,lon,lat);
+    const hypo=Math.sqrt(dist*dist+epicenter.depth*epicenter.depth);
+    const hasP=simTime>=hypo/P_SPD, hasS=simTime>=hypo/S_SPD;
     if(seismoStatuses[i]){
       if(hasS){seismoStatuses[i].textContent='S波到達';seismoStatuses[i].style.color='var(--s)';}
       else if(hasP){seismoStatuses[i].textContent='P波到達';seismoStatuses[i].style.color='var(--p)';}
@@ -491,7 +538,8 @@ function updateHUD(){
   document.getElementById('hudLoc').textContent=(epicenter.location||'').slice(0,18)||'—';
 }
 function updateStationList(){
-  document.getElementById('stationList').innerHTML=STATIONS.map(([name,code,lon,lat])=>{
+  // Show all 22 counties in left panel
+  document.getElementById('stationList').innerHTML=MAP_STATIONS.map(([name,code,lon,lat])=>{
     const d=geoDist(epicenter.lon,epicenter.lat,lon,lat);
     const h=Math.sqrt(d*d+epicenter.depth*epicenter.depth);
     return `<div class="sta-item"><div class="sta-dot" style="background:var(--p)" id="dot-${code}"></div><div class="sta-name">${name}</div><div class="sta-times">P:<span>${(h/P_SPD).toFixed(0)}s</span> S:<span>${(h/S_SPD).toFixed(0)}s</span></div></div>`;

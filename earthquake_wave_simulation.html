@@ -41,7 +41,7 @@ header{
 .left-panel{width:260px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--rim);display:flex;flex-direction:column;overflow:hidden;z-index:600;}
 .lp-section{border-bottom:1px solid rgba(0,229,255,.08);padding:10px 12px;}
 .lp-title{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
-.eq-list{flex:1;overflow-y:auto;padding:6px 8px;scrollbar-width:thin;scrollbar-color:var(--dim) transparent;}
+.eq-list{flex:1;min-height:160px;overflow-y:auto;padding:6px 8px;scrollbar-width:thin;scrollbar-color:var(--dim) transparent;}
 .eq-card{padding:8px 10px;margin-bottom:5px;border:1px solid var(--rim);border-radius:4px;cursor:pointer;transition:all .2s;background:rgba(0,180,255,.04);position:relative;}
 .eq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent;transition:background .2s;}
 .eq-card:hover{border-color:rgba(0,229,255,.4);background:rgba(0,229,255,.05);}
@@ -187,7 +187,7 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;b
       </div>
     </div>
 
-    <div class="lp-section" style="overflow-y:auto;flex-shrink:0;">
+    <div class="lp-section" style="overflow-y:auto;max-height:210px;flex-shrink:1;">
       <div class="lp-title">📡 各站抵達時間</div>
       <div id="stationList"></div>
     </div>

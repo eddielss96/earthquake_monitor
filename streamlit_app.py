@@ -25,7 +25,16 @@ import json as _json
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-st.set_page_config(layout="wide", page_title="台灣地震資料面板", page_icon="🌏")
+# ── 語言設定 / Language Setting ──────────────────────────────────────────────
+if "lang" not in st.session_state:
+    st.session_state.lang = "zh"
+_LANG = st.session_state.lang
+
+def t(zh: str, en: str = "") -> str:
+    """回傳對應語言字串 / Return localized string."""
+    return en if (_LANG == "en" and en) else zh
+
+st.set_page_config(layout="wide", page_title=t("台灣地震資料面板","Taiwan Earthquake Dashboard"), page_icon="🌏")
 
 # ── 常數 ──────────────────────────────────────────────────────────────────────
 BASE   = "https://opendata.cwa.gov.tw/api/v1/rest/datastore"
@@ -34,15 +43,25 @@ NS_TAG = "{urn:cwa:gov:tw:cwacommon:0.1}"
 DATA_DIR = "data"   # GitHub repo 本地備援資料夾
 
 # ── 地圖設定 ──────────────────────────────────────────────────────────────────
-MAP_STYLE_OPTIONS = {
-    "🌑 深色（預設）":          "carto-darkmatter",
-    "☀️ 淺色":                "carto-positron",
-    "🗺️ OpenStreetMap":      "open-street-map",
-    "🏔️ 地形圖 (OpenTopo)":  "__open_topo__",    # OpenTopoMap（免費）
-    "🛰️ 衛星影像 (ESRI)":    "__esri_imagery__", # ESRI World Imagery（免費）
-    "📡 臺灣電子地圖 (NLSC)":  "__nlsc_emap__",
+_MAP_ZH = {
+    "🌑 深色（預設）": "carto-darkmatter",
+    "☀️ 淺色":       "carto-positron",
+    "🗺️ OpenStreetMap": "open-street-map",
+    "🏔️ 地形圖 (OpenTopo)": "__open_topo__",
+    "🛰️ 衛星影像 (ESRI)": "__esri_imagery__",
+    "📡 臺灣電子地圖 (NLSC)": "__nlsc_emap__",
     "🛰️ 臺灣衛星影像 (NLSC)": "__nlsc_photo__",
 }
+_MAP_EN = {
+    "🌑 Dark (Default)": "carto-darkmatter",
+    "☀️ Light":         "carto-positron",
+    "🗺️ OpenStreetMap": "open-street-map",
+    "🏔️ Topographic (OpenTopo)": "__open_topo__",
+    "🛰️ Satellite (ESRI)": "__esri_imagery__",
+    "📡 Taiwan E-Map (NLSC)": "__nlsc_emap__",
+    "🛰️ Taiwan Satellite (NLSC)": "__nlsc_photo__",
+}
+MAP_STYLE_OPTIONS = _MAP_EN if _LANG == "en" else _MAP_ZH
 
 MAP_CHART_CONFIG = {
     "scrollZoom": True,
@@ -90,7 +109,7 @@ INTENSITY_COLOR = {
 }
 
 def intensity_int(s):
-    if not s or s in ("未知","不限"): return -1
+    if not s or s in ("未知", "不限", "Any"): return -1
     m = re.search(r"(\d+)(強|弱)?", str(s))
     if not m: return -1
     base = int(m.group(1)) * 10
@@ -136,10 +155,22 @@ def fetch_s3_or_local(s3_url: str, local_path: str, timeout=60):
 # ══════════════════════════════════════════════════════════════════════════════
 # 側邊欄
 # ══════════════════════════════════════════════════════════════════════════════
-st.sidebar.title("🌏 台灣地震資料面板")
+st.sidebar.title(t("🌏 台灣地震資料面板", "🌏 Taiwan Earthquake Dashboard"))
+
+# ── 語言切換 / Language Toggle ────────────────────────────────
+st.sidebar.write(t("### 🌐 語言", "### 🌐 Language"))
+_lc1, _lc2 = st.sidebar.columns(2)
+with _lc1:
+    if st.button("🇹🇼 中文", key="lang_zh", use_container_width=True,
+                 type="primary" if _LANG == "zh" else "secondary"):
+        st.session_state.lang = "zh"; st.rerun()
+with _lc2:
+    if st.button("🇺🇸 English", key="lang_en", use_container_width=True,
+                 type="primary" if _LANG == "en" else "secondary"):
+        st.session_state.lang = "en"; st.rerun()
 
 # ── API 金鑰（安全版）────────────────────────────────────────────────────────
-st.sidebar.write("### 🔑 CWA API 金鑰")
+st.sidebar.write(t("### 🔑 CWA API 金鑰", "### 🔑 CWA API Key"))
 
 _secret_key = ""
 _has_secret = False
@@ -152,23 +183,23 @@ except Exception:
 if _has_secret:
     # Secrets 已設定 → 完全不顯示金鑰，靜默使用
     api_key = _secret_key
-    st.sidebar.success("🔒 已從 Secrets 安全載入，金鑰不顯示於畫面")
+    st.sidebar.success(t("🔒 已從 Secrets 安全載入，金鑰不顯示於畫面", "🔒 Loaded securely from Secrets"))
 else:
     # 未設定 Secrets → 顯示輸入框（本機測試用）
-    st.sidebar.warning("⚠️ 本機測試模式，正式部署請改用 Secrets")
+    st.sidebar.warning(t("⚠️ 本機測試模式，正式部署請改用 Secrets", "⚠️ Local test mode — use Secrets for production"))
     with st.sidebar.form("api_form"):
         api_key = st.text_input(
-            "API 金鑰（本機測試用）",
+            t("API 金鑰（本機測試用）", "API Key (local testing)"),
             value="",
             type="password",
             placeholder="CWA-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
-            help="正式部署請使用 Streamlit Secrets，勿將金鑰寫進程式碼",
+            help=t("正式部署請使用 Streamlit Secrets，勿將金鑰寫進程式碼", "Use Streamlit Secrets for deployment, never hardcode"),
         )
-        api_submitted = st.form_submit_button("✅ 套用", use_container_width=True)
+        api_submitted = st.form_submit_button(t("✅ 套用","✅ Apply"), use_container_width=True)
         if api_submitted:
             st.cache_data.clear()
 
-    with st.sidebar.expander("🔐 如何安全設定 API 金鑰"):
+    with st.sidebar.expander(t("🔐 如何安全設定 API 金鑰","🔐 How to set API Key securely")):
         st.markdown("""
 **Streamlit Community Cloud（推薦）：**
 1. 進入 App 設定 → **Secrets**
@@ -191,13 +222,13 @@ CWA_API_KEY = "CWA-你的金鑰"
 
 
 # 地圖樣式
-st.sidebar.write("### 🗺️ 地圖樣式")
+st.sidebar.write(t("### 🗺️ 地圖樣式", "### 🗺️ Map Style"))
 map_style_label = st.sidebar.selectbox(
     "圖層", list(MAP_STYLE_OPTIONS.keys()), index=0, label_visibility="collapsed"
 )
 map_style_key = MAP_STYLE_OPTIONS[map_style_label]
 
-st.sidebar.markdown("""
+st.sidebar.markdown(t("""
 ---
 ### 規模說明
 | 顏色 | 分類 | 規模 |
@@ -209,18 +240,30 @@ st.sidebar.markdown("""
 
 **© 交通部中央氣象署**  
 [氣象資料開放平台](https://opendata.cwa.gov.tw)
-""")
+""", """
+---
+### Magnitude Scale
+| Color | Category | Magnitude |
+|:---:|------|:---:|
+| 🔴 | Major | ≥ 6.0 |
+| 🟠 | Moderate | 5.0–5.9 |
+| 🟢 | Minor | 3.0–4.9 |
+| 🔵 | Micro | < 3.0 |
+
+**© Central Weather Administration**  
+[Open Data Platform](https://opendata.cwa.gov.tw)
+"""))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
 tab_cat, tab_felt, tab_tsu, tab_town, tab_wave = st.tabs([
-    "📚 歷史地震目錄",
-    "📋 有感地震報告",
-    "🌊 海嘯資訊",
-    "🆕 最新地震",
-    "📡 震波模擬",
+    t("📚 歷史地震目錄",    "📚 Historical Catalog"),
+    t("📋 有感地震報告",    "📋 Felt Earthquakes"),
+    t("🌊 海嘯資訊",       "🌊 Tsunami Info"),
+    t("🆕 最新地震",       "🆕 Latest Earthquake"),
+    t("📡 震波模擬",       "📡 Wave Simulation"),
 ])
 
 
@@ -228,7 +271,7 @@ tab_cat, tab_felt, tab_tsu, tab_town, tab_wave = st.tabs([
 # TAB 1：歷史地震目錄  E-A0073-001 + E-A0073-002
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_cat:
-    st.write("## 📚 歷史地震目錄")
+    st.write(t("## 📚 歷史地震目錄", "## 📚 Historical Earthquake Catalog"))
     st.caption(
         "**E-A0073-001**：本年度目錄（S3）　"
         "**E-A0073-002**：1990–2025 歷史目錄（S3，首次約 30 秒）　"
@@ -237,13 +280,13 @@ with tab_cat:
 
     ctl1, ctl2, ctl3, ctl4 = st.columns([2,1,1,1])
     with ctl1:
-        yr_range = st.slider("年份範圍", 1990, 2026, (2010, 2026), key="cat_yr")
+        yr_range = st.slider(t("年份範圍","Year Range"), 1990, 2026, (2010, 2026), key="cat_yr")
     with ctl2:
-        min_mag_cat = st.select_slider("最小規模", [3.0,4.0,5.0,6.0], value=3.0, key="cat_min_mag")
+        min_mag_cat = st.select_slider(t("最小規模","Min Magnitude"), [3.0,4.0,5.0,6.0], value=3.0, key="cat_min_mag")
     with ctl3:
-        load_hist = st.checkbox("載入歷史資料\n(1990–2025)", value=True, key="cat_hist")
+        load_hist = st.checkbox(t("載入歷史資料\n(1990–2025)","Load History\n(1990–2025)"), value=True, key="cat_hist")
     with ctl4:
-        upload_hist = st.file_uploader("或上傳 E-A0073-002.zip", type="zip", key="cat_upload")
+        upload_hist = st.file_uploader(t("或上傳 E-A0073-002.zip","Or upload E-A0073-002.zip"), type="zip", key="cat_upload")
 
     # ── 函式 ──────────────────────────────────────────────────────────────────
     def _post_process_catalog(df: pd.DataFrame) -> pd.DataFrame:
@@ -354,11 +397,11 @@ with tab_cat:
 
     # ── 指標 ──────────────────────────────────────────────────────────────────
     m1,m2,m3,m4,m5 = st.columns(5)
-    m1.metric("📋 總筆數",    f"{len(df_cf):,}")
-    m2.metric("⚡ 最大規模",  f"M {df_cf['mag'].max():.1f}"   if not df_cf.empty else "—")
-    m3.metric("📐 平均規模",  f"M {df_cf['mag'].mean():.2f}"  if not df_cf.empty else "—")
-    m4.metric("⬇️ 平均深度", f"{df_cf['depth'].mean():.1f} km" if not df_cf.empty else "—")
-    m5.metric("🔴 M≥6 地震", f"{len(df_cf[df_cf['mag']>=6]):,}")
+    m1.metric(t("📋 總筆數","📋 Total"),    f"{len(df_cf):,}")
+    m2.metric(t("⚡ 最大規模","⚡ Max Mag."),  f"M {df_cf['mag'].max():.1f}"   if not df_cf.empty else "—")
+    m3.metric(t("📐 平均規模","📐 Avg Mag."),  f"M {df_cf['mag'].mean():.2f}"  if not df_cf.empty else "—")
+    m4.metric(t("⬇️ 平均深度","⬇️ Avg Depth"), f"{df_cf['depth'].mean():.1f} km" if not df_cf.empty else "—")
+    m5.metric(t("🔴 M≥6 地震","🔴 M≥6 Events"), f"{len(df_cf[df_cf['mag']>=6]):,}")
     st.markdown("---")
 
     # ── 地圖 ＋ 圖表 ──────────────────────────────────────────────────────────
@@ -406,16 +449,16 @@ with tab_cat:
     with col_chart:
         ann = df_cf.groupby(["year","mag_cat"]).size().reset_index(name="次數")
         fig_ann = px.bar(ann, x="year", y="次數", color="mag_cat",
-                         color_discrete_map=MAG_COLOR, title="年度地震次數",
-                         labels={"year":"年份","次數":"次數","mag_cat":"分類"},
+                         color_discrete_map=MAG_COLOR, title=t("年度地震次數","Annual Count"),
+                         labels={"year":t("年份","Year"),"次數":t("次數","Count"),"mag_cat":t("分類","Category")},
                          category_orders={"mag_cat":MAG_ORDER})
         fig_ann.update_layout(xaxis_tickangle=45, legend_title_text="分類",
                                height=250, margin=dict(t=35,b=0,l=0,r=0))
         st.plotly_chart(fig_ann, use_container_width=True)
 
         fig_hc = px.histogram(df_cf, x="mag", nbins=30, color="mag_cat",
-                              color_discrete_map=MAG_COLOR, title="規模頻率分布",
-                              labels={"mag":"芮氏規模(M)","mag_cat":"分類"},
+                              color_discrete_map=MAG_COLOR, title=t("規模頻率分布","Magnitude Distribution"),
+                              labels={"mag":"M","mag_cat":t("分類","Category")},
                               category_orders={"mag_cat":MAG_ORDER})
         fig_hc.update_layout(barmode="stack", legend_title_text="分類",
                               height=250, margin=dict(t=35,b=0,l=0,r=0))
@@ -423,8 +466,8 @@ with tab_cat:
 
     fig_scat = px.scatter(df_map, x="mag", y="depth", color="mag_cat",
                           color_discrete_map=MAG_COLOR, opacity=0.4,
-                          title="規模 vs 深度（km）",
-                          labels={"mag":"芮氏規模(M)","depth":"深度(km)","mag_cat":"分類"},
+                          title=t("規模 vs 深度（km）","Magnitude vs Depth (km)"),
+                          labels={"mag":"M","depth":t("深度(km)","Depth(km)"),"mag_cat":t("分類","Category")},
                           category_orders={"mag_cat":MAG_ORDER})
     fig_scat.update_yaxes(autorange="reversed")
     fig_scat.update_layout(legend_title_text="分類")
@@ -435,7 +478,7 @@ with tab_cat:
 # TAB 2：有感地震報告  E-A0015-001 + E-A0016-001
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_felt:
-    st.write("## 📋 有感地震報告")
+    st.write(t("## 📋 有感地震報告","## 📋 Felt Earthquake Reports"))
     st.caption(
         "**E-A0015-001**：顯著有感地震　**E-A0016-001**：小區域有感地震　"
         "ℹ️ 兩資料集均為「最新 N 筆」報告，筆數少屬正常（並非歷史全量）。"
@@ -443,15 +486,15 @@ with tab_felt:
 
     fc1,fc2,fc3 = st.columns(3)
     with fc1:
-        use_sig   = st.checkbox("顯著有感地震 (E-A0015-001)", value=True)
-        use_small = st.checkbox("小區域有感地震 (E-A0016-001)", value=True)
+        use_sig   = st.checkbox(t("顯著有感地震 (E-A0015-001)","Significant Felt (E-A0015-001)"), value=True)
+        use_small = st.checkbox(t("小區域有感地震 (E-A0016-001)","Local Felt (E-A0016-001)"), value=True)
     with fc2:
-        felt_limit = st.select_slider("每資料集筆數", [30,100,200,500,1000], value=500, key="felt_lim")
+        felt_limit = st.select_slider(t("每資料集筆數","Records/dataset"), [30,100,200,500,1000], value=500, key="felt_lim")
     with fc3:
         min_int_label = st.select_slider(
-            "最低最大震度",
-            ["不限","1級","2級","3級","4級","5弱","5強","6弱","6強","7級"],
-            value="不限", key="felt_int",
+            t("最低最大震度","Min Intensity"),
+            [t("不限","Any"),"1級","2級","3級","4級","5弱","5強","6弱","6強","7級"],
+            value=t("不限","Any"), key="felt_int",
         )
 
     @st.cache_data(ttl=3600, show_spinner=False)
@@ -516,11 +559,11 @@ with tab_felt:
             df_felt = df_felt[df_felt["int_sort"] >= min_int_val]
 
         fm1,fm2,fm3,fm4 = st.columns(4)
-        fm1.metric("📋 筆數", f"{len(df_felt):,}")
-        fm2.metric("⚡ 最大規模", f"M {df_felt['mag'].max():.1f}" if not df_felt.empty else "—")
+        fm1.metric(t("📋 筆數","📋 Count"), f"{len(df_felt):,}")
+        fm2.metric(t("⚡ 最大規模","⚡ Max Mag."), f"M {df_felt['mag'].max():.1f}" if not df_felt.empty else "—")
         top_int = df_felt.sort_values("int_sort",ascending=False).iloc[0]["max_intensity"] if not df_felt.empty else "—"
-        fm3.metric("🌊 最大震度", top_int)
-        fm4.metric("🔴 M≥6 地震", f"{len(df_felt[df_felt['mag']>=6]):,}")
+        fm3.metric(t("🌊 最大震度","🌊 Max Intensity"), top_int)
+        fm4.metric(t("🔴 M≥6 地震","🔴 M≥6 Events"), f"{len(df_felt[df_felt['mag']>=6]):,}")
         if not df_felt.empty:
             st.caption(
                 f"資料期間：{df_felt['time'].min().strftime('%Y-%m-%d')} ～ "
@@ -533,7 +576,7 @@ with tab_felt:
         with col_l:
             st.write(f"共 **{len(df_felt):,}** 筆，點選列查看詳情：")
             disp = df_felt[["time","mag","max_intensity","depth","location","report_color"]].copy()
-            disp.columns = ["時間","規模(M)","最大震度","深度(km)","位置","報告顏色"]
+            disp.columns = [t("時間","Time"),t("規模(M)","Mag(M)"),t("最大震度","Max Int."),t("深度(km)","Depth(km)"),t("位置","Location"),t("報告顏色","Color")]
             event = st.dataframe(disp, hide_index=True, use_container_width=True,
                                  height=400, on_select="rerun", selection_mode="multi-row")
 
@@ -623,8 +666,8 @@ with tab_felt:
             mon_df["month"] = mon_df["time"].dt.to_period("M").astype(str)
             monthly = mon_df.groupby(["month","mag_cat"]).size().reset_index(name="次數")
             fig_mo = px.bar(monthly, x="month", y="次數", color="mag_cat",
-                            color_discrete_map=MAG_COLOR, title="每月地震次數",
-                            labels={"month":"月份","次數":"次數","mag_cat":"分類"},
+                            color_discrete_map=MAG_COLOR, title=t("每月地震次數","Monthly Count"),
+                            labels={"month":t("月份","Month"),"次數":t("次數","Count"),"mag_cat":t("分類","Category")},
                             category_orders={"mag_cat":MAG_ORDER})
             fig_mo.update_layout(xaxis_tickangle=45, legend_title_text="分類")
             st.plotly_chart(fig_mo, use_container_width=True)
@@ -634,8 +677,8 @@ with tab_felt:
                        .sort_values("sk", ascending=False).drop(columns="sk"))
             fig_int = px.bar(int_cnt, x="max_intensity", y="次數",
                              color="max_intensity", color_discrete_map=INTENSITY_COLOR,
-                             title="最大震度分布",
-                             labels={"max_intensity":"最大震度","次數":"次數"},
+                             title=t("最大震度分布","Max Intensity Dist."),
+                             labels={"max_intensity":t("最大震度","Max Intensity"),"次數":t("次數","Count")},
                              category_orders={"max_intensity":INTENSITY_ORDER})
             fig_int.update_layout(showlegend=False)
             st.plotly_chart(fig_int, use_container_width=True)
@@ -645,7 +688,7 @@ with tab_felt:
 # TAB 3：海嘯資訊  E-A0014-001
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_tsu:
-    st.write("## 🌊 海嘯資訊")
+    st.write(t("## 🌊 海嘯資訊","## 🌊 Tsunami Information"))
     st.caption("**E-A0014-001**：太平洋地區 M≥6.5 地震海嘯監測報告")
 
     @st.cache_data(ttl=3600, show_spinner=False)
@@ -689,10 +732,10 @@ with tab_tsu:
         COLOR_HEX   = {"綠色":"#34C759","黃色":"#FFD700","橙色":"#FF9F0A","紅色":"#FF2D20"}
 
         tm1,tm2,tm3,tm4 = st.columns(4)
-        tm1.metric("📋 報告筆數", len(df_tsu))
-        tm2.metric("⚡ 最大規模", f"M {df_tsu['mag'].max():.1f}")
-        tm3.metric("🔴 紅/橙警報", len(df_tsu[df_tsu["color"].isin(["紅色","橙色"])]))
-        tm4.metric("📅 最新報告", df_tsu["time"].max().strftime("%Y-%m-%d"))
+        tm1.metric(t("📋 報告筆數","📋 Reports"), len(df_tsu))
+        tm2.metric(t("⚡ 最大規模","⚡ Max Mag."), f"M {df_tsu['mag'].max():.1f}")
+        tm3.metric(t("🔴 紅/橙警報","🔴 Red/Orange Alerts"), len(df_tsu[df_tsu["color"].isin(["紅色","橙色"])]))
+        tm4.metric(t("📅 最新報告","📅 Latest Report"), df_tsu["time"].max().strftime("%Y-%m-%d"))
 
         df_tsu["_sz"] = df_tsu["mag"].clip(lower=5.0)
         c_tsu = {"lat":10,"lon":160}
@@ -713,7 +756,7 @@ with tab_tsu:
                                margin=dict(r=0,t=0,l=0,b=0))
         st.plotly_chart(fig_tmap, use_container_width=True, config=MAP_CHART_CONFIG)
 
-        st.write("### 海嘯報告列表")
+        st.write(t("### 海嘯報告列表","### Tsunami Report List"))
         for _, row in df_tsu.iterrows():
             emoji = COLOR_EMOJI.get(row["color"],"⚪")
             with st.expander(
@@ -732,7 +775,7 @@ with tab_tsu:
 # TAB 4：最新地震  E-A0015-005
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_town:
-    st.write("## 🆕 最新地震")
+    st.write(t("## 🆕 最新地震","## 🆕 Latest Earthquake"))
     st.caption(
         "**E-A0015-005**：最新顯著地震之各鄉鎮震度（S3 每 5 分鐘更新）　"
         "本地備援：`data/E-A0015-005.json`"
@@ -774,10 +817,10 @@ with tab_town:
 
                 st.info(f"📍 {desc}")
                 ti1,ti2,ti3,ti4 = st.columns(4)
-                ti1.metric("⚡ 規模",  f"M {mag_val}")
-                ti2.metric("🕐 時間",  pd.to_datetime(origin).strftime("%m/%d %H:%M"))
-                ti3.metric("⬇️ 深度", f"{depth} km")
-                ti4.metric("📍 震央",  f"{epi_lat:.2f}°N {epi_lon:.2f}°E")
+                ti1.metric(t("⚡ 規模","⚡ Magnitude"),  f"M {mag_val}")
+                ti2.metric(t("🕐 時間","🕐 Time"),  pd.to_datetime(origin).strftime("%m/%d %H:%M"))
+                ti3.metric(t("⬇️ 深度","⬇️ Depth"), f"{depth} km")
+                ti4.metric(t("📍 震央","📍 Epicenter"),  f"{epi_lat:.2f}°N {epi_lon:.2f}°E")
 
                 counties = safe_list(eq_data.get("Intensity",{}).get("County",[]))
                 rows = []
@@ -831,22 +874,22 @@ with tab_town:
 
                     col_sum, col_detail = st.columns([1,2])
                     with col_sum:
-                        st.write("### 各縣市最大震度")
+                        st.write(t("### 各縣市最大震度","### Max Intensity by County"))
                         c_sum = (df_town.groupby(["county","county_max"])
                                  .agg(鄉鎮數=("town","count")).reset_index()
-                                 .rename(columns={"county":"縣市","county_max":"最大震度"})
+                                 .rename(columns={"county":t("縣市","County"),"county_max":t("最大震度","Max Int.")})
                                  .assign(sk=lambda x: x["最大震度"].map(intensity_int))
                                  .sort_values("sk", ascending=False).drop(columns="sk"))
                         st.dataframe(c_sum, hide_index=True, use_container_width=True)
 
                     with col_detail:
-                        st.write("### 鄉鎮震度明細（前 50 筆）")
+                        st.write(t("### 鄉鎮震度明細（前 50 筆）","### Township Intensity (Top 50)"))
                         # ✅ 先排序再切欄（修正 int_sort KeyError）
                         detail = (df_town
                                   .sort_values("int_sort", ascending=False)
                                   [["county","town","intensity"]]
                                   .head(50)
-                                  .rename(columns={"county":"縣市","town":"鄉鎮","intensity":"震度"}))
+                                  .rename(columns={"county":t("縣市","County"),"town":t("鄉鎮","Township"),"intensity":t("震度","Intensity")}))
                         st.dataframe(detail, hide_index=True, use_container_width=True)
 
         except Exception as e:
@@ -860,8 +903,8 @@ with tab_town:
 # TAB 5：震波模擬（注入有感地震資料）
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_wave:
-    st.write("## 📡 地震震波模擬")
-    st.caption("從有感地震報告中選取一筆，觀察 P 波、S 波、表面波的傳遞過程。")
+    st.write(t("## 📡 地震震波模擬","## 📡 Seismic Wave Simulation"))
+    st.caption(t("從有感地震報告中選取一筆，觀察 P 波、S 波、表面波的傳遞過程。","Select an earthquake to observe P-wave, S-wave, and surface wave propagation."))
 
     import json as _json_wave
     import streamlit.components.v1 as _components
